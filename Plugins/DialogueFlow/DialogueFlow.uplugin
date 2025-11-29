@@ -1,0 +1,29 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "Dialogue Flow",
+	"Description": "Custom dialogue asset type and graph editor for building branching narrative flows.",
+	"Category": "Designer Tools",
+	"CreatedBy": "God's Studio",
+	"CreatedByURL": "https://www.godsstudio.com",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+		"Name": "DialogueFlow",
+		"Type": "Runtime",
+		"LoadingPhase": "Default"
+		},
+		{
+		"Name": "DialogueFlowEditor",
+		"Type": "Editor",
+		"LoadingPhase": "Default"
+		}
+	]
+}
