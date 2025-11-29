@@ -18,6 +18,8 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Styling/AppStyle.h"
+#include "Styling/CoreStyle.h"
+
 
 void SConversationGraphDialogueNode::Construct(
     const FArguments& InArgs,
@@ -35,60 +37,91 @@ void SConversationGraphDialogueNode::UpdateGraphNode()
     RightNodeBox.Reset();
     LeftNodeBox.Reset();
 
+    // Let graph create pins first
     GraphNode->AllocateDefaultPins();
     this->ContentScale.Bind(this, &SGraphNode::GetContentScale);
 
-    // Cache runtime node
-    UConversationGraphDialogueNode* GraphDialogue = Cast<UConversationGraphDialogueNode>(GraphNode);
-    CachedDialogueNode = GraphDialogue ? GraphDialogue->GetDialogueNode() : nullptr;
+    UConversationGraphDialogueNode* GraphDialogueNode = Cast<UConversationGraphDialogueNode>(GraphNode);
+    CachedDialogueNode = GraphDialogueNode ? GraphDialogueNode->GetDialogueNode() : nullptr;
 
-    // Build main layout
+    //
+    // MAIN CONTENT LAYOUT
+    //
     TSharedRef<SVerticalBox> Root =
         SNew(SVerticalBox)
 
-        // TITLE BAR
+        // Title bar
         + SVerticalBox::Slot()
         .AutoHeight()
         [
             BuildTitleBar()
         ]
 
-        // Header (Speaker + Dialogue Text)
+        // Dialogue header (speaker + dialogue text)
         + SVerticalBox::Slot()
         .AutoHeight()
         [
             BuildDialogueHeader(CachedDialogueNode)
         ]
 
-        // Choices List
-        + SVerticalBox::Slot()
-        .AutoHeight()
-        .Padding(FMargin(0, 4))
-        [
-            BuildChoicesWidget(CachedDialogueNode)
-        ]
-
-        // Pin Layout (Input Left, Output Right)
+        // MAIN pin area (Left pins + Right choice pins)
         + SVerticalBox::Slot()
         .AutoHeight()
         .Padding(FMargin(0, 6))
         [
             SNew(SHorizontalBox)
 
+                // LEFT PIN COLUMN (Input Pin)
                 + SHorizontalBox::Slot()
                 .AutoWidth()
+                .VAlign(VAlign_Top)
                 [
                     SAssignNew(LeftNodeBox, SVerticalBox)
                 ]
 
+                // RIGHT CHOICE COLUMN
                 + SHorizontalBox::Slot()
                 .FillWidth(1.f)
-                .HAlign(HAlign_Right)
+                .Padding(FMargin(20, 0, 0, 0)) // spacing between input pins and choices
                 [
-                    SAssignNew(RightNodeBox, SVerticalBox)
+                    SNew(SVerticalBox)
+
+                        // "Choices" Label
+                        + SVerticalBox::Slot()
+                        .AutoHeight()
+                        .Padding(FMargin(0, 0, 0, 4))
+                        [
+                            SNew(STextBlock)
+                                .Text(FText::FromString("Choices"))
+                                .Font(FAppStyle::Get().GetFontStyle("BoldFont"))
+                                .ColorAndOpacity(FLinearColor(0.8f, 0.8f, 1.f))
+                        ]
+
+                        // CHOICE OUTPUT PINS
+                        + SVerticalBox::Slot()
+                        .AutoHeight()
+                        [
+                            SAssignNew(RightNodeBox, SVerticalBox)
+                        ]
+
+                        // ADD CHOICE BUTTON
+                        + SVerticalBox::Slot()
+                        .AutoHeight()
+                        .Padding(FMargin(0, 8))
+                        [
+                            SNew(SButton)
+                                .ButtonStyle(FAppStyle::Get(), "SimpleButton")
+                                .ToolTipText(FText::FromString("Add a new choice"))
+                                .OnClicked(this, &SConversationGraphDialogueNode::HandleAddChoiceClicked)
+                                [
+                                    SNew(STextBlock)
+                                        .Text(FText::FromString("+ Add Choice"))
+                                ]
+                        ]
                 ]
         ];
 
+    // INSTALL CONTENT INTO NODE
     GetOrAddSlot(ENodeZone::Center)
         [
             SNew(SBorder)
@@ -99,6 +132,7 @@ void SConversationGraphDialogueNode::UpdateGraphNode()
                 ]
         ];
 
+    // FINALLY BUILD PIN WIDGETS
     CreatePinWidgets();
 }
 
@@ -244,42 +278,93 @@ void SConversationGraphDialogueNode::CreatePinWidgets()
     UEdGraphNode* Node = GraphNode;
     check(Node);
 
+    UConversationGraphDialogueNode* GraphDialogueNode = Cast<UConversationGraphDialogueNode>(Node);
+    UDialogueFlowDialogueNode* RuntimeNode = GraphDialogueNode ? GraphDialogueNode->GetDialogueNode() : nullptr;
+
+    int32 OutputIndex = 0;
+
     for (UEdGraphPin* Pin : Node->Pins)
     {
-        TSharedPtr<SGraphPin> NewPin = SNew(SConversationGraphPinRound, Pin);
+        // Create our custom round pin widget
+        TSharedPtr<SGraphPin> NewPinWidget =
+            SNew(SConversationGraphPinRound, Pin);
 
-        if (!NewPin.IsValid())
+        if (!NewPinWidget.IsValid())
+        {
             continue;
+        }
 
-        NewPin->SetOwner(SharedThis(this));
+        // Required for correct Slate graph behavior
+        NewPinWidget->SetOwner(SharedThis(this));
 
+        //
+        // INPUT PIN – left side
+        //
         if (Pin->Direction == EGPD_Input)
         {
             LeftNodeBox->AddSlot()
                 .AutoHeight()
                 [
-                    NewPin.ToSharedRef()
+                    NewPinWidget.ToSharedRef()
                 ];
 
-            InputPins.Add(NewPin.ToSharedRef());
+            InputPins.Add(NewPinWidget.ToSharedRef());
+            continue;
         }
-        else
-        {
-            RightNodeBox->AddSlot()
-                .AutoHeight()
-                [
-                    NewPin.ToSharedRef()
-                ];
 
-            OutputPins.Add(NewPin.ToSharedRef());
-        }
+        //
+        // OUTPUT PIN – RIGHT SIDE (TEXT FIRST, PIN SECOND)
+        //
+        const FText LabelText =
+            (RuntimeNode &&
+                RuntimeNode->Choices.IsValidIndex(OutputIndex) &&
+                !RuntimeNode->Choices[OutputIndex].ChoiceTitle.IsEmpty())
+            ? RuntimeNode->Choices[OutputIndex].ChoiceTitle
+            : FText::FromString(FString::Printf(TEXT("Choice %d"), OutputIndex + 1));
+
+        //
+        // Build row: TEXT on left, PIN on right
+        //
+        TSharedRef<SHorizontalBox> PinRow =
+            SNew(SHorizontalBox)
+
+            // Label first (left-aligned)
+            + SHorizontalBox::Slot()
+            .FillWidth(1.f)
+            .VAlign(VAlign_Center)
+            [
+                SNew(STextBlock)
+                    .Text(LabelText)
+                    .ColorAndOpacity(FLinearColor(0.9f, 0.9f, 0.95f, 1.f))
+                    .Font(FAppStyle::Get().GetFontStyle("NormalFont"))
+                    .WrapTextAt(260.f)
+            ]
+
+        // The actual pin (aligned right for easy dragging)
+        + SHorizontalBox::Slot()
+            .AutoWidth()
+            .HAlign(HAlign_Right)
+            .VAlign(VAlign_Center)
+            [
+                NewPinWidget.ToSharedRef()
+            ];
+
+        RightNodeBox->AddSlot()
+            .AutoHeight()
+            .Padding(FMargin(0, 2))
+            [
+                PinRow
+            ];
+
+        OutputPins.Add(NewPinWidget.ToSharedRef());
+        OutputIndex++;
     }
 }
 
 TSharedRef<SWidget> SConversationGraphDialogueNode::BuildTitleBar()
 {
-    // Try to load your dialogue icon from the editor style
-    const FSlateBrush* IconBrush = FAppStyle::Get().GetBrush("GraphEditor.Comment_16x");
+    // Use a CoreStyle icon that definitely exists
+    const FSlateBrush* IconBrush = FCoreStyle::Get().GetBrush("Icons.Comment");
 
     return
         SNew(SBorder)
@@ -312,4 +397,23 @@ TSharedRef<SWidget> SConversationGraphDialogueNode::BuildTitleBar()
                         .ColorAndOpacity(FLinearColor(0.95f, 0.95f, 1.f))
                 ]
         ];
+}
+
+FReply SConversationGraphDialogueNode::HandleAddChoiceClicked()
+{
+    if (CachedDialogueNode)
+    {
+        CachedDialogueNode->Choices.AddDefaulted();
+        CachedDialogueNode->Modify();
+    }
+
+    if (UConversationGraphDialogueNode* GraphNodeObj = Cast<UConversationGraphDialogueNode>(GraphNode))
+    {
+        if (UEdGraph* Graph = GraphNodeObj->GetGraph())
+        {
+            Graph->NotifyGraphChanged();
+        }
+    }
+
+    return FReply::Handled();
 }

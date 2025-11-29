@@ -19,6 +19,13 @@ UConversationGraphDialogueNode::UConversationGraphDialogueNode()
 {
 }
 
+UConversationGraphDialogueNode::~UConversationGraphDialogueNode()
+{
+    #if WITH_EDITOR
+    UnbindFromRuntimeNode();
+    #endif
+}
+
 UDialogueFlowDialogueNode* UConversationGraphDialogueNode::GetOrCreateDialogueNode()
 {
     // If we already have a runtime node, return it.
@@ -64,10 +71,14 @@ void UConversationGraphDialogueNode::AllocateDefaultPins()
     UDialogueFlowDialogueNode* DNode = GetDialogueNode();
     Pins.Empty();
 
-    // ---- Input Pin ---------------------------------------------------------
+    // Input Pin
     CreatePin(EGPD_Input, TEXT("DialogueFlow"), PinInput);
 
-    // ---- Output Pins --------------------------------------------------------
+#if WITH_EDITOR
+    BindToRuntimeNode();
+#endif
+
+    // Output Pins
     if (DNode)
     {
         for (int32 i = 0; i < DNode->Choices.Num(); i++)
@@ -98,7 +109,7 @@ void UConversationGraphDialogueNode::RebuildOutputPins()
     {
         RemovePin(Pin);
     }
-
+ 
     // Regenerate output pins
     UDialogueFlowDialogueNode* DNode = GetDialogueNode();
     if (!DNode)
@@ -139,26 +150,57 @@ void UConversationGraphDialogueNode::SyncChoicePinIndices()
     }
 }
 
+void UConversationGraphDialogueNode::RenameOutputPinsFromChoices()
+{
+    UDialogueFlowDialogueNode* DNode = GetDialogueNode();
+    if (!DNode)
+        return;
+
+    int32 OutputIndex = 0;
+
+    for (UEdGraphPin* Pin : Pins)
+    {
+        if (Pin->Direction == EGPD_Output)
+        {
+            // Determine new name based on choice title
+            FString NewPinName;
+
+            if (DNode->Choices.IsValidIndex(OutputIndex))
+            {
+                const FText& Title = DNode->Choices[OutputIndex].ChoiceTitle;
+
+                if (Title.IsEmpty())
+                {
+                    NewPinName = FString::Printf(TEXT("Choice %d"), OutputIndex + 1);
+                }
+                else
+                {
+                    NewPinName = Title.ToString();
+                }
+            }
+            else
+            {
+                NewPinName = FString::Printf(TEXT("Choice %d"), OutputIndex + 1);
+            }
+
+            // Actually rename the pin
+            Pin->PinName = *NewPinName;
+
+            OutputIndex++;
+        }
+    }
+}
+
+#if WITH_EDITOR
+
 void UConversationGraphDialogueNode::PinConnectionListChanged(UEdGraphPin* Pin)
 {
     Super::PinConnectionListChanged(Pin);
 }
 
-void UConversationGraphDialogueNode::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+TSharedPtr<SGraphNode> UConversationGraphDialogueNode::CreateVisualWidget()
 {
-    Super::PostEditChangeProperty(PropertyChangedEvent);
-
-    if (PropertyChangedEvent.Property)
-    {
-        const FName PropertyName = PropertyChangedEvent.Property->GetFName();
-
-        // If the Choices array changed...
-        if (PropertyName == GET_MEMBER_NAME_CHECKED(UDialogueFlowDialogueNode, Choices))
-        {
-            RebuildOutputPins();
-            SyncChoicePinIndices();
-        }
-    }
+    return SNew(SConversationGraphDialogueNode, this);
 }
 
 FText UConversationGraphDialogueNode::GetNodeTitle(ENodeTitleType::Type TitleType) const
@@ -186,9 +228,59 @@ FText UConversationGraphDialogueNode::GetTooltipText() const
     return LOCTEXT("DialogueNodeTooltip", "NPC line and branching dialogue choices.");
 }
 
-TSharedPtr<SGraphNode> UConversationGraphDialogueNode::CreateVisualWidget()
+void UConversationGraphDialogueNode::BindToRuntimeNode()
 {
-    return SNew(SConversationGraphDialogueNode, this);
+    UDialogueFlowDialogueNode* Runtime = GetDialogueNode();
+    if (!Runtime || bIsBoundToRuntimeNode)
+    {
+        return;
+    }
+
+    Runtime->OnPropertyChangedEvent().AddUObject(
+        this,
+        &UConversationGraphDialogueNode::HandleRuntimePropertyChanged
+    );
+
+    bIsBoundToRuntimeNode = true;
 }
+
+void UConversationGraphDialogueNode::UnbindFromRuntimeNode()
+{
+    UDialogueFlowDialogueNode* Runtime = Cast<UDialogueFlowDialogueNode>(DialogueNode);
+    if (!Runtime || !bIsBoundToRuntimeNode)
+    {
+        return;
+    }
+
+    Runtime->OnPropertyChangedEvent().RemoveAll(this);
+    bIsBoundToRuntimeNode = false;
+}
+
+void UConversationGraphDialogueNode::HandleRuntimePropertyChanged(const FPropertyChangedEvent& PropertyChangedEvent)
+{
+    const FName PropertyName = PropertyChangedEvent.Property
+        ? PropertyChangedEvent.Property->GetFName()
+        : NAME_None;
+
+    // If the Choices array changed in size, rebuild pin list
+    if (PropertyName == GET_MEMBER_NAME_CHECKED(UDialogueFlowDialogueNode, Choices))
+    {
+        RebuildOutputPins();
+        SyncChoicePinIndices();
+    }
+
+    // If any field on a choice changed (e.g. ChoiceTitle),
+    // we rename the pins to match new names.
+    RenameOutputPinsFromChoices();
+
+    // Refresh the visual graph node
+    if (UEdGraph* Graph = GetGraph())
+    {
+        Graph->NotifyGraphChanged();
+    }
+}
+
+#endif
+
 
 #undef LOCTEXT_NAMESPACE

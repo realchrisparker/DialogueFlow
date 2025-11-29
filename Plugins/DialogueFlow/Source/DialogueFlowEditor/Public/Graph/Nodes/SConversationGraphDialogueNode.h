@@ -61,4 +61,7 @@ protected:
 
     /** Title bar (icon + "Dialogue") */
     TSharedRef<SWidget> BuildTitleBar();
+
+private:
+    FReply HandleAddChoiceClicked();
 };

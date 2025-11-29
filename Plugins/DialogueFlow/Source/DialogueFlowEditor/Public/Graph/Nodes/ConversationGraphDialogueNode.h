@@ -35,16 +35,14 @@ class DIALOGUEFLOWEDITOR_API UConversationGraphDialogueNode : public UConversati
 
 public:
 
+    // Constructor
     UConversationGraphDialogueNode();
+    
+    // Destructor
+    virtual ~UConversationGraphDialogueNode() override;
 
     // UEdGraphNode interface
     virtual void AllocateDefaultPins() override;
-    virtual void PinConnectionListChanged(UEdGraphPin* Pin) override;
-    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-    virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
-    virtual FLinearColor GetNodeTitleColor() const override;
-    virtual FText GetTooltipText() const override;
-    virtual TSharedPtr<SGraphNode> CreateVisualWidget() override;
 
     /**
      * Returns the runtime dialogue node associated with this graph node.
@@ -63,13 +61,47 @@ public:
      */
     virtual UObject* GetPropertyObject() const override;
 
+#if WITH_EDITOR
+
+    virtual void PinConnectionListChanged(UEdGraphPin* Pin) override;
+    virtual TSharedPtr<SGraphNode> CreateVisualWidget() override;
+    virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
+    virtual FLinearColor GetNodeTitleColor() const override;
+    virtual FText GetTooltipText() const override;
+
+    /** Called when a property changes on the runtime dialogue node */
+    void HandleRuntimePropertyChanged(const FPropertyChangedEvent& PropertyChangedEvent);
+
+#endif
+
 protected:
+
+#if WITH_EDITOR
+    /*
+     * Functions
+    */
 
     /** Rebuilds all pins to match the Choices array. */
     void RebuildOutputPins();
 
     /** Updates LinkedOutputPinIndex for all choices. */
     void SyncChoicePinIndices();
+
+    /** Renames output pins based on ChoiceTitle text. */
+    void RenameOutputPinsFromChoices();
+
+    /** Bind/unbind runtime node events */
+    void BindToRuntimeNode();
+    void UnbindFromRuntimeNode();
+
+    /*
+     * Properties
+    */
+
+    /** Keep track of binding so we don’t double-bind */
+    bool bIsBoundToRuntimeNode = false;
+
+#endif
 
     /**
      * Ensures that a runtime UDialogueFlowDialogueNode exists and returns it.

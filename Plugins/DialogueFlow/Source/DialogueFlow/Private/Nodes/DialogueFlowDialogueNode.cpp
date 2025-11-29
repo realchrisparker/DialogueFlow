@@ -9,7 +9,6 @@
 // ============================================================================
 
 #include <Nodes/DialogueFlowDialogueNode.h>
-// #include "DialogueFlowComponent.h"
 
 
 #define LOCTEXT_NAMESPACE "DialogueFlowDialogueNode"
@@ -91,6 +90,14 @@ void UDialogueFlowDialogueNode::ValidateNode(FDialogueFlowValidationContext& Con
     // Future:
     // - Warn if node has no choices and bAutoAdvance=false (dead end)
     // - Warn if node has choices but no output pins
+}
+
+void UDialogueFlowDialogueNode::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+
+    // Broadcast to listeners in the editor module
+    PropertyChangedDelegate.Broadcast(PropertyChangedEvent);
 }
 
 #endif // WITH_EDITOR

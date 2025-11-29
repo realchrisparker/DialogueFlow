@@ -15,8 +15,17 @@
 #include <Structs/FDialogueChoice.h>
 #include "DialogueFlowDialogueNode.generated.h"
 
+
+// Forward declarations
 class UDialogueFlowComponent;
 class FDialogueFlowValidationContext;
+
+
+/** Fired whenever a property on this dialogue node changes (editor only). */
+#if WITH_EDITOR
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnDialogueNodePropertyChanged, const FPropertyChangedEvent&);
+#endif
+
 
 /**
  * UDialogueFlowDialogueNode
@@ -143,6 +152,14 @@ public:
     float AutoAdvanceDelay = 0.0f;
 
 #if WITH_EDITOR
+    FOnDialogueNodePropertyChanged& OnPropertyChangedEvent() { return PropertyChangedDelegate; }
+#endif
+
+#if WITH_EDITOR
+    /*
+     * Functions
+    */
+
     /**
      * Editor-only: returns the body color used when rendering this node.
      *
@@ -176,5 +193,19 @@ public:
      * @param Context  Validation context providing graph-level information.
      */
     virtual void ValidateNode(FDialogueFlowValidationContext& Context) const override;
+
+    /**
+     * Editor-only: called when a property is changed in the editor.
+     * Used to notify the containing graph of changes.
+     * @param PropertyChangedEvent  Information about the property change.
+     */
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
+    /*
+     * Properties
+    */
+
+    FOnDialogueNodePropertyChanged PropertyChangedDelegate;
+
 #endif // WITH_EDITOR
 };
