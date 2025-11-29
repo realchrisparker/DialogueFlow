@@ -14,10 +14,20 @@
 
 #define LOCTEXT_NAMESPACE "ConversationGraphNodes"
 
+UConversationGraphStartNode::UConversationGraphStartNode(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+}
+
 void UConversationGraphStartNode::AllocateDefaultPins()
 {
-    // Start node: Only an output pin
-    CreatePin(EGPD_Output, TEXT("DialogueFlow"), PinOutput);
+    Super::AllocateDefaultPins();
+
+    // Remove input pin for Start node
+    if (UEdGraphPin* InputPin = FindPin(PinInput))
+    {
+        RemovePin(InputPin);
+    }
 }
 
 FText UConversationGraphStartNode::GetNodeTitle(ENodeTitleType::Type TitleType) const

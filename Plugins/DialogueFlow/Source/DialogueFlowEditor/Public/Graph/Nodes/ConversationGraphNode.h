@@ -15,6 +15,9 @@ class DIALOGUEFLOWEDITOR_API UConversationGraphNode : public UEdGraphNode
 
 public:
 
+    // Constructor
+    UConversationGraphNode(const FObjectInitializer& ObjectInitializer);
+
     /** Runtime node reference stored inside the ConversationAsset */
     UPROPERTY()
     UDialogueFlowBaseNode* DialogueNode;
@@ -26,6 +29,8 @@ public:
     virtual void AllocateDefaultPins() override;
     virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
     virtual void PrepareForCopying() override;
+
+    virtual void ReconstructNode() override;
 
     /** Returns the UObject that should appear in the details panel when this graph node is selected. */
     virtual UObject* GetPropertyObject() const

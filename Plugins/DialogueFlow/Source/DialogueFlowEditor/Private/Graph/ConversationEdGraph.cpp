@@ -60,6 +60,15 @@ void UConversationEdGraph::RebuildGraph()
         StartNode = NewStart;
         Modify();
     }
+
+    // Reconstruct nodes to rebuild their pins from data
+    for (UEdGraphNode* Node : Nodes)
+    {
+        if (Node)
+        {
+            Node->ReconstructNode();
+        }
+    }
 }
 
 void UConversationEdGraph::ValidateGraph()
@@ -143,10 +152,10 @@ void UConversationEdGraph::ValidateGraph()
         FoundEnd = NewEnd;
     }
 
-    // Dialogue Node Validation -----------------------------------
+    // Dialogue Node Validation
     ValidateDialogueNodes();
 
-    // Enforce single-output rule for choice pins -----------------
+    // Enforce single-output rule for choice pins
     FixDialogueConnections();
 
     // Break cycles (schema blocks creation, but this cleans legacy) 

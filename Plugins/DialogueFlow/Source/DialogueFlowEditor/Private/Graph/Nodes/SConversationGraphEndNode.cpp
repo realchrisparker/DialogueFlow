@@ -22,7 +22,7 @@ void SConversationGraphEndNode::UpdateGraphNode()
     RightNodeBox.Reset();
     LeftNodeBox.Reset();
 
-    GraphNode->AllocateDefaultPins();
+    // GraphNode->AllocateDefaultPins();
 
     this->ContentScale.Bind(this, &SGraphNode::GetContentScale);
 

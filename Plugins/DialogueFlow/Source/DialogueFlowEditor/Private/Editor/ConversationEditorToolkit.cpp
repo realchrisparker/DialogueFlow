@@ -186,17 +186,19 @@ void FConversationEditorToolkit::RegisterTabSpawners(const TSharedRef<FTabManage
 {
     FAssetEditorToolkit::RegisterTabSpawners(InTabManager);
 
+    // Register Graph Editor Tab
     InTabManager->RegisterTabSpawner(GraphEditorTabId,
         FOnSpawnTab::CreateRaw(this, &FConversationEditorToolkit::SpawnGraphEditorTab))
         .SetDisplayName(LOCTEXT("GraphEditorTabLabel", "Conversation Graph"))
         .SetGroup(WorkspaceMenuCategory.ToSharedRef());
+    InTabManager->SetMainTab(FTabId(GraphEditorTabId)); // Ensure this tab can not be closed.
 
+    // Register Details Tab
     InTabManager->RegisterTabSpawner(DetailsTabID,
         FOnSpawnTab::CreateSP(this, &FConversationEditorToolkit::SpawnTab_Details))
         .SetDisplayName(FText::FromString("Details"))
         .SetGroup(WorkspaceMenuCategory.ToSharedRef())
         .SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
-
 }
 
 void FConversationEditorToolkit::UnregisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)

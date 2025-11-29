@@ -15,10 +15,22 @@
 const FName UConversationGraphNode::PinInput = TEXT("In");
 const FName UConversationGraphNode::PinOutput = TEXT("Out");
 
+
+UConversationGraphNode::UConversationGraphNode(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+    CreateNewGuid(); // Ensure each node has a unique identifier
+}
+
 void UConversationGraphNode::AllocateDefaultPins()
 {
-    // Default graph nodes have both an input and output pin
+    // let parent class clear pins
+    Pins.Reset();
+
+    // input
     CreatePin(EGPD_Input, TEXT("DialogueFlow"), PinInput);
+
+    // output
     CreatePin(EGPD_Output, TEXT("DialogueFlow"), PinOutput);
 }
 
@@ -43,5 +55,32 @@ void UConversationGraphNode::PrepareForCopying()
     {
         DialogueNode->SetFlags(RF_Transactional);
         DialogueNode->Rename(nullptr, this, REN_DontCreateRedirectors);
+    }
+}
+
+void UConversationGraphNode::ReconstructNode()
+{
+    // Save old pins for link restoration
+    TArray<UEdGraphPin*> OldPins = Pins;
+
+    // Clear and rebuild the pins
+    AllocateDefaultPins();
+
+    // Attempt to reconnect old links using pin name/direction
+    for (UEdGraphPin* OldPin : OldPins)
+    {
+        if (!OldPin) continue;
+
+        for (UEdGraphPin* NewPin : Pins)
+        {
+            const bool bMatchDir  = (NewPin->Direction == OldPin->Direction);
+            const bool bMatchName = (NewPin->PinName   == OldPin->PinName);
+
+            if (bMatchDir && bMatchName)
+            {
+                NewPin->MovePersistentDataFromOldPin(*OldPin);
+                break;
+            }
+        }
     }
 }

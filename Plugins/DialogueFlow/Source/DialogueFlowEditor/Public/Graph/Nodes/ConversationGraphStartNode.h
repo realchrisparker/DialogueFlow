@@ -10,6 +10,8 @@ class DIALOGUEFLOWEDITOR_API UConversationGraphStartNode : public UConversationG
     GENERATED_BODY()
 
 public:
+    UConversationGraphStartNode(const FObjectInitializer& ObjectInitializer);
+
     virtual void AllocateDefaultPins() override;
 
     virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;

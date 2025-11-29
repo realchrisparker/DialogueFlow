@@ -54,13 +54,15 @@ public:
      */
     UPROPERTY(EditAnywhere, Instanced, Category = "Dialogue Flow", meta = (DisplayName = "Nodes"))
     TArray<class UDialogueFlowBaseNode*> Nodes;
-
+    
+#if WITH_EDITORONLY_DATA
     /**
      * The editor graph representing this conversation in the Dialogue Flow Editor.
      *
      * This graph stores node positions, links, and visual layout.
      * It is *not* exposed to designers and is used purely by the editor.
      */
-    UPROPERTY()
+    UPROPERTY(VisibleAnywhere, Instanced, Category = "Editor")
     TObjectPtr<UEdGraph> EditorGraph;
+#endif
 };

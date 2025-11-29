@@ -38,7 +38,7 @@ void SConversationGraphDialogueNode::UpdateGraphNode()
     LeftNodeBox.Reset();
 
     // Let graph create pins first
-    GraphNode->AllocateDefaultPins();
+    // GraphNode->AllocateDefaultPins();
     this->ContentScale.Bind(this, &SGraphNode::GetContentScale);
 
     UConversationGraphDialogueNode* GraphDialogueNode = Cast<UConversationGraphDialogueNode>(GraphNode);

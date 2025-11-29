@@ -15,9 +15,11 @@
 
 #define LOCTEXT_NAMESPACE "ConversationGraphNodes"
 
-UConversationGraphDialogueNode::UConversationGraphDialogueNode()
+UConversationGraphDialogueNode::UConversationGraphDialogueNode(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 }
+
 
 UConversationGraphDialogueNode::~UConversationGraphDialogueNode()
 {
@@ -68,29 +70,20 @@ UObject* UConversationGraphDialogueNode::GetPropertyObject() const
 
 void UConversationGraphDialogueNode::AllocateDefaultPins()
 {
-    UDialogueFlowDialogueNode* DNode = GetDialogueNode();
-    Pins.Empty();
+    Pins.Reset();                       // remove old pins safely
 
-    // Input Pin
+    // Input pin
     CreatePin(EGPD_Input, TEXT("DialogueFlow"), PinInput);
 
-#if WITH_EDITOR
-    BindToRuntimeNode();
-#endif
-
-    // Output Pins
-    if (DNode)
+    // Output pins
+    UDialogueFlowDialogueNode* DNode = GetDialogueNode();
+    for (int32 Index = 0; Index < DNode->Choices.Num(); Index++)
     {
-        for (int32 i = 0; i < DNode->Choices.Num(); i++)
-        {
-            const FText& Title = DNode->Choices[i].ChoiceTitle;
-            const FString PinName = Title.IsEmpty()
-                ? FString::Printf(TEXT("Choice %d"), i)
-                : Title.ToString();
+        FString PinName = DNode->Choices[Index].ChoiceTitle.IsEmpty()
+            ? FString::Printf(TEXT("Choice %d"), Index)
+            : DNode->Choices[Index].ChoiceTitle.ToString();
 
-            UEdGraphPin* NewPin = CreatePin(EGPD_Output, TEXT("DialogueFlow"), *PinName);
-            DNode->Choices[i].LinkedOutputPinIndex = i;
-        }
+        CreatePin(EGPD_Output, TEXT("DialogueFlow"), *PinName);
     }
 }
 
@@ -191,6 +184,34 @@ void UConversationGraphDialogueNode::RenameOutputPinsFromChoices()
     }
 }
 
+void UConversationGraphDialogueNode::ReconstructNode()
+{
+    TArray<UEdGraphPin*> OldPins = Pins;
+
+    // Rebuild pins based on Choices
+    AllocateDefaultPins();
+
+    int32 OutputIndex = 0;
+
+    for (UEdGraphPin* NewPin : Pins)
+    {
+        if (NewPin->Direction != EGPD_Output)
+            continue;
+
+        if (OldPins.IsValidIndex(OutputIndex))
+        {
+            UEdGraphPin* OldPin = OldPins[OutputIndex];
+
+            if (OldPin)
+            {
+                NewPin->MovePersistentDataFromOldPin(*OldPin);
+            }
+        }
+
+        OutputIndex++;
+    }
+}
+
 #if WITH_EDITOR
 
 void UConversationGraphDialogueNode::PinConnectionListChanged(UEdGraphPin* Pin)
@@ -200,6 +221,10 @@ void UConversationGraphDialogueNode::PinConnectionListChanged(UEdGraphPin* Pin)
 
 TSharedPtr<SGraphNode> UConversationGraphDialogueNode::CreateVisualWidget()
 {
+#if WITH_EDITOR
+    BindToRuntimeNode();
+#endif
+    
     return SNew(SConversationGraphDialogueNode, this);
 }
 

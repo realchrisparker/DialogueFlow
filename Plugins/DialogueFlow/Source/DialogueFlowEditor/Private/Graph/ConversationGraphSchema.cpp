@@ -119,92 +119,74 @@ void UConversationGraphSchema::GetContextMenuActions(UToolMenu* Menu, UGraphNode
 
 const FPinConnectionResponse UConversationGraphSchema::CanCreateConnection(const UEdGraphPin* A, const UEdGraphPin* B) const
 {
+    // Basic sanity
     if (A == B)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Cannot connect a pin to itself."));
+    {
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("Cannot connect a pin to itself.")
+        );
+    }
 
     if (A->Direction == B->Direction)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Pins must be opposite directions."));
+    {
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("Pins must be opposite directions.")
+        );
+    }
 
+    // *** IMPORTANT: use editor graph nodes, not runtime nodes ***
     UConversationGraphNode* NodeA = Cast<UConversationGraphNode>(A->GetOwningNode());
     UConversationGraphNode* NodeB = Cast<UConversationGraphNode>(B->GetOwningNode());
 
     if (!NodeA || !NodeB)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Only DialogueFlow nodes supported."));
-
-    // ---- START NODE: No inputs ----
-    if (NodeA->IsA(UConversationGraphStartNode::StaticClass()) && A->Direction == EGPD_Input)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Start node cannot have inputs."));
-
-    if (NodeB->IsA(UConversationGraphStartNode::StaticClass()) && B->Direction == EGPD_Input)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Start node cannot have inputs."));
-
-    // ---- END NODE: No outputs ----
-    if (NodeA->IsA(UConversationGraphEndNode::StaticClass()) && A->Direction == EGPD_Output)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("End nodes cannot have outputs."));
-
-    if (NodeB->IsA(UConversationGraphEndNode::StaticClass()) && B->Direction == EGPD_Output)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("End nodes cannot have outputs."));
-
-    // ---- NO CYCLES ALLOWED ----
     {
-        // Prevent A → B when B already leads to A
-        UEdGraphNode* EndNode = const_cast<UEdGraphNode*>(B->GetOwningNode());
-        TSet<const UEdGraphNode*> Visited;
-
-        TArray<const UEdGraphNode*> Stack;
-        Stack.Add(EndNode);
-
-        while (!Stack.IsEmpty())
-        {
-            const UEdGraphNode* Current = Stack.Pop();
-            if (Current == NodeA)
-            {
-                return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
-                    TEXT("This connection would create a cycle."));
-            }
-
-            Visited.Add(Current);
-
-            for (const UEdGraphPin* Pin : Current->Pins)
-            {
-                if (Pin->Direction == EGPD_Output)
-                {
-                    for (const UEdGraphPin* Linked : Pin->LinkedTo)
-                    {
-                        const UEdGraphNode* LinkedNode = Linked->GetOwningNode();
-                        if (!Visited.Contains(LinkedNode))
-                        {
-                            Stack.Add(LinkedNode);
-                        }
-                    }
-                }
-            }
-        }
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("Only conversation graph nodes are supported.")
+        );
     }
 
-    // ---- DIALOGUE PIN: Only one connection per output pin ----
-    if (A->Direction == EGPD_Output && A->LinkedTo.Num() >= 1)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
-            TEXT("Dialogue choice outputs allow only one connection."));
-
-    if (B->Direction == EGPD_Output && B->LinkedTo.Num() >= 1)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
-            TEXT("Dialogue choice outputs allow only one connection."));
-
-    // ---- DIALOGUE → START forbidden (no going back to start) ----
-    if (NodeB->IsA(UConversationGraphStartNode::StaticClass()) && B->Direction == EGPD_Output)
-        return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW,
-            TEXT("Cannot route Dialogue flow back into the Start node."));
-
-    if (NodeA->IsA(UConversationGraphStartNode::StaticClass()) && A->Direction == EGPD_Output)
+    // ---- START NODE RULE ----
+    if (NodeA->IsA(UConversationGraphStartNode::StaticClass()) &&
+        A->Direction == EGPD_Input)
     {
-        // Start → Dialogue ✔ allowed
-        // Start → End ✔ allowed (placeholder conversation)
-        return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, TEXT(""));
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("Start node cannot have inputs.")
+        );
     }
 
-    // ---- Dialogue → Dialogue ✔ allowed ----
-    // ---- Dialogue → End ✔ allowed ----
+    if (NodeB->IsA(UConversationGraphStartNode::StaticClass()) &&
+        B->Direction == EGPD_Input)
+    {
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("Start node cannot have inputs.")
+        );
+    }
+
+    // ---- END NODE RULE ----
+    if (NodeA->IsA(UConversationGraphEndNode::StaticClass()) &&
+        A->Direction == EGPD_Output)
+    {
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("End nodes cannot have outputs.")
+        );
+    }
+
+    if (NodeB->IsA(UConversationGraphEndNode::StaticClass()) &&
+        B->Direction == EGPD_Output)
+    {
+        return FPinConnectionResponse(
+            CONNECT_RESPONSE_DISALLOW,
+            TEXT("End nodes cannot have outputs.")
+        );
+    }
+
+    // Everything else is fine
     return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, TEXT(""));
 }
 

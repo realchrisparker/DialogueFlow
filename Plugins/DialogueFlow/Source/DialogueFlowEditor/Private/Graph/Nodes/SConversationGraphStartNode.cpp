@@ -23,7 +23,7 @@ void SConversationGraphStartNode::UpdateGraphNode()
     LeftNodeBox.Reset();
 
     // Let the underlying UEdGraphNode create its pins
-    GraphNode->AllocateDefaultPins();
+    // GraphNode->AllocateDefaultPins();
 
     this->ContentScale.Bind(this, &SGraphNode::GetContentScale);
 
