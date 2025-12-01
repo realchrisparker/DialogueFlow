@@ -3,57 +3,44 @@
 // All Rights Reserved.
 //
 // Project: Dialogue Flow
-// File: ConversationGraphEndNode.cpp
-// Description: Editor graph node representing an End node.
+// File: ConversationGraphEndNode.h
+// Description: Editor End node. One input pin, no outputs.
 // ============================================================================
 
-#include <Graph/Nodes/ConversationGraphEndNode.h>
-#include <Graph/Nodes/SConversationGraphEndNode.h>
+#include "Graph/Nodes/ConversationGraphEndNode.h"
 #include "EdGraph/EdGraphPin.h"
 
-
-#define LOCTEXT_NAMESPACE "ConversationGraphNodes"
-
 UConversationGraphEndNode::UConversationGraphEndNode(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer)
+	: Super(ObjectInitializer)
 {
+	NodeClassName = "End";
 }
 
 void UConversationGraphEndNode::AllocateDefaultPins()
 {
-    Super::AllocateDefaultPins();
+	// Base class creates In + Out pins
+	Super::AllocateDefaultPins();
 
-    // Remove output pin
-    if (UEdGraphPin* OutPin = FindPin(PinOutput))
-    {
-        RemovePin(OutPin);
-    }
+	// Remove output pin — end node never has outputs
+	if (UEdGraphPin* OutPin = FindPin(FName("Out"), EGPD_Output))
+	{
+		Pins.Remove(OutPin);
+	}
 }
 
-FText UConversationGraphEndNode::GetNodeTitle(ENodeTitleType::Type TitleType) const
+void UConversationGraphEndNode::PostEditUndo()
 {
-    return LOCTEXT("EndConversationTitle", "End Conversation");
+	Super::PostEditUndo();
+
+	ReconstructNode();
+
+	if (UEdGraph* Graph = GetGraph())
+	{
+		Graph->NotifyGraphChanged();
+	}
 }
 
-FLinearColor UConversationGraphEndNode::GetNodeTitleColor() const
-{
-    return FLinearColor(1.0f, 0.25f, 0.25f); // Red-ish for End
-}
-
-FText UConversationGraphEndNode::GetTooltipText() const
-{
-    return LOCTEXT("EndNodeTooltip", "Marks the end of the conversation.");
-}
-
-FSlateIcon UConversationGraphEndNode::GetIconAndTint(FLinearColor& OutColor) const
-{
-    OutColor = FLinearColor(1.0f, 0.25f, 0.25f);
-    return FSlateIcon(FAppStyle::GetAppStyleSetName(), "GraphEditor.Stop_16x");
-}
-
-TSharedPtr<SGraphNode> UConversationGraphEndNode::CreateVisualWidget()
-{
-    return SNew(SConversationGraphEndNode, this);
-}
-
-#undef LOCTEXT_NAMESPACE
+// TSharedRef<SGraphNode> UConversationGraphEndNode::CreateVisualWidget()
+// {
+// 	return SNew(SConversationGraphEndNode, this);
+// }

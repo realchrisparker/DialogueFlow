@@ -4,25 +4,32 @@
 //
 // Project: Dialogue Flow
 // File: ConversationEdGraph.h
-// Description: Base graph class for Dialogue Flow editor graphs.
+// Description: Custom editor graph used by the Dialogue Flow editor. Handles
+//              schema assignment, start-node validation, and safe lifecycle
+//              reconstruction without corrupting Slate widgets.
 // ============================================================================
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraph.h"
-#include <Graph/Nodes/ConversationGraphStartNode.h>
 #include "ConversationEdGraph.generated.h"
 
-
-class UConversationGraphDialogueNode;
-class UConversationGraphEndNode;
-class UDialogueFlowDialogueNode;
-
+class UConversationGraphStartNode;
 
 /**
- * Custom graph used by Dialogue Flow assets.
- * Holds a reference to the Start Node and manages graph initialization.
+ * UConversationEdGraph
+ *
+ * Custom EdGraph used by the Dialogue Flow editor. Responsible for:
+ * - Assigning the custom graph schema
+ * - Ensuring a Start Node exists
+ * - Safe PostLoad handling (NO destructive reconstruction)
+ * - Syncing editor node connections to runtime node data
+ *
+ * NOTE:
+ *   This graph deliberately avoids calling ReconstructNode() inside PostLoad()
+ *   because Slate visual nodes & schema actions are not initialized yet.
+ *   Calling ReconstructNode() here destroys custom SGraphNode layouts.
  */
 UCLASS()
 class DIALOGUEFLOWEDITOR_API UConversationEdGraph : public UEdGraph
@@ -33,32 +40,42 @@ public:
 
     UConversationEdGraph();
 
-    /** The Start Node created automatically when the graph is constructed. */
-    UPROPERTY()
-    UConversationGraphStartNode* StartNode;
+    /**
+     * Returns the Start Node in this graph (if any).
+     * Dynamically searched every time to avoid stale pointers.
+     */
+    UConversationGraphStartNode* FindStartNode() const;
 
-#if WITH_EDITOR
+    /**
+     * Ensures a Start Node always exists.
+     * Creates one if missing. Does NOT reconstruct the graph.
+     */
+    void EnsureStartNodeExists();
+
+    /**
+     * Called when the asset is loaded from disk.
+     * Assigns the schema and ensures a Start Node exists.
+     * NO pin reconstruction or graph rebuild is done here.
+     */
     virtual void PostLoad() override;
+
+    /**
+     * Non-destructive validation.
+     * (Used before saving or syncing.)
+     */
+    void ValidateGraphSafe();
+
+    /**
+     * Pushes editor graph wiring into the runtime DialogueFlow nodes.
+     * Clears runtime InputLinks/OutputLinks and rebuilds from editor pins.
+     */
+    void SyncEditorGraphToRuntime();
+
+    /**
+     * Called when the user performs Undo/Redo.
+     * Safe to call ReconstructNode() here because the editor UI is fully initialized.
+     */
     virtual void PostEditUndo() override;
-#endif
-    
-    /** Rebuilds internal node references after undo/redo or loading. */
-    void RebuildGraph();
 
-    /** Validates the graph structure, fixes invalid nodes or pins, and ensures schema rules are enforced. */
-    void ValidateGraph();    
-
-private:
-
-    /** Ensures all Dialogue Node runtime data is valid. */
-    void ValidateDialogueNodes();
-
-    /** Removes invalid connections, enforces choice-one-output rule. */
-    void FixDialogueConnections();
-
-    /** Performs cycle detection and breaks illegal cycles. */
-    void BreakCycles();
-
-    /** Depth-first search helper for cycle detection. */
-    bool HasPathToNode(UEdGraphNode* Start, UEdGraphNode* Target) const;
+    void EnsureRequiredNodesExist();
 };

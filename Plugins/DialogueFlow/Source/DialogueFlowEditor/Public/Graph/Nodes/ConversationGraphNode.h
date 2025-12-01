@@ -1,12 +1,50 @@
+// ============================================================================
+// Copyright © 2025 God's Studio
+// All Rights Reserved.
+//
+// Project: Dialogue Flow
+// File: ConversationGraphNode.h
+// Description: Base editor graph node with full pin connection serialization.
+// ============================================================================
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraphNode.h"
-#include <Nodes/DialogueFlowBaseNode.h>
 #include "ConversationGraphNode.generated.h"
 
 /**
- * Graph node representing a dialogue flow node in the editor
+ * Saved connection data for one pin→pin relationship.
+ */
+USTRUCT()
+struct FConversationSavedPinLink
+{
+    GENERATED_BODY()
+
+    /** GUID of this pin */
+    UPROPERTY()
+    FGuid ThisPinId;
+
+    /** GUID of the linked pin */
+    UPROPERTY()
+    FGuid LinkedPinId;
+};
+
+/**
+ * Wrapper: all saved links for this node.
+ */
+USTRUCT()
+struct FConversationNodeSavedConnection
+{
+    GENERATED_BODY()
+
+    /** All saved connections */
+    UPROPERTY()
+    TArray<FConversationSavedPinLink> SavedLinks;
+};
+
+/**
+ * Base class for all conversation graph nodes in the editor graph.
  */
 UCLASS()
 class DIALOGUEFLOWEDITOR_API UConversationGraphNode : public UEdGraphNode
@@ -15,27 +53,36 @@ class DIALOGUEFLOWEDITOR_API UConversationGraphNode : public UEdGraphNode
 
 public:
 
-    // Constructor
     UConversationGraphNode(const FObjectInitializer& ObjectInitializer);
 
-    /** Runtime node reference stored inside the ConversationAsset */
+    // Node type for identifying Start, End, Dialogue subclasses
+    UPROPERTY(EditDefaultsOnly, Category = "Dialogue")
+    FName NodeClassName;
+
+    // Saved connection data (per-node, serialized properly)
     UPROPERTY()
-    UDialogueFlowBaseNode* DialogueNode;
+    FConversationNodeSavedConnection SavedConnectionData;
 
-    // Pin name constants
-    static const FName PinInput;
-    static const FName PinOutput;
-
+    // Called when pins need to be rebuilt
     virtual void AllocateDefaultPins() override;
-    virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
-    virtual void PrepareForCopying() override;
 
+    // Reconstruction (called by UE during load / undo / etc.)
     virtual void ReconstructNode() override;
 
-    /** Returns the UObject that should appear in the details panel when this graph node is selected. */
-    virtual UObject* GetPropertyObject() const
-    {
-        return nullptr;
-    }
+    // Serialization
+    virtual void Serialize(FArchive& Ar) override;
 
+    // Called after load
+    virtual void PostLoad() override;
+
+    virtual void PostEditUndo() override;
+
+
+    UFUNCTION()
+    UDialogueFlowBaseNode* GetNodeData() const;
+
+protected:
+
+    /** Restores connections using GUIDs saved in SavedConnectionData */
+    void RestoreConnections();
 };

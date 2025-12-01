@@ -15,10 +15,20 @@ void FDialogueFlowEditorModule::StartupModule()
     // Register Conversation Asset type actions
     ConversationAssetActions = MakeShared<FConversationAssetTypeActions>(DialogueFlowAssetCategory);
     AssetTools.RegisterAssetTypeActions(ConversationAssetActions.ToSharedRef());
+
+    // REGISTER NODE FACTORY
+    GraphNodeFactory = MakeShared<FConversationGraphNodeFactory>();
+    FEdGraphUtilities::RegisterVisualNodeFactory(GraphNodeFactory);
 }
 
 void FDialogueFlowEditorModule::ShutdownModule()
 {
+    if (GraphNodeFactory.IsValid())
+    {
+        FEdGraphUtilities::UnregisterVisualNodeFactory(GraphNodeFactory);
+        GraphNodeFactory.Reset();
+    }
+    
     if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
     {
         IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();

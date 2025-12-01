@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 #include "AssetTypeCategories.h"
+#include "Factories/SConversationGraphNodeFactory.h"
 
 
 /**
@@ -23,4 +24,6 @@ private:
 
     // We store this to unregister it later
     TSharedPtr<class FConversationAssetTypeActions> ConversationAssetActions;
+
+    TSharedPtr<FConversationGraphNodeFactory> GraphNodeFactory;
 };

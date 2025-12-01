@@ -8,6 +8,10 @@
 // ============================================================================
 
 #include <Factories/ConversationAssetFactory.h>
+#include <Graph/ConversationEdGraph.h>
+#include <Graph/ConversationGraphSchema.h>
+#include <Graph/Nodes/ConversationGraphStartNode.h>
+#include <Graph/Nodes/ConversationGraphEndNode.h>
 #include <Assets/ConversationAsset.h>
 
 /*
@@ -32,5 +36,40 @@ UObject* UConversationAssetFactory::FactoryCreateNew(
     FFeedbackContext* Warn
 )
 {
-    return NewObject<UConversationAsset>(InParent, Class, Name, Flags);
+    // Create the asset
+    UConversationAsset* NewAsset = NewObject<UConversationAsset>(InParent, Class, Name, Flags);
+    NewAsset->Modify();
+
+    // Create the Editor Graph
+    UConversationEdGraph* Graph = NewObject<UConversationEdGraph>(
+        NewAsset,
+        UConversationEdGraph::StaticClass(),
+        NAME_None,
+        RF_Transactional
+    );
+    Graph->Schema = UConversationGraphSchema::StaticClass();
+    Graph->Modify();
+
+    // Assign to asset
+    NewAsset->EditorGraph = Graph;
+
+    // CREATE REQUIRED START NODE
+    {
+        FGraphNodeCreator<UConversationGraphStartNode> Creator(*Graph);
+        UConversationGraphStartNode* StartNode = Creator.CreateNode(false);
+        StartNode->NodePosX = -200;
+        StartNode->NodePosY = 0;
+        Creator.Finalize();
+    }
+
+    // CREATE REQUIRED END NODE
+    {
+        FGraphNodeCreator<UConversationGraphEndNode> Creator(*Graph);
+        UConversationGraphEndNode* EndNode = Creator.CreateNode(false);
+        EndNode->NodePosX = 400;
+        EndNode->NodePosY = 0;
+        Creator.Finalize();
+    }
+
+    return NewAsset;
 }

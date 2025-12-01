@@ -4,115 +4,91 @@
 //
 // Project: Dialogue Flow
 // File: ConversationEditorToolkit.h
-// Description: Editor toolkit for editing Conversation Assets. 
-//              Provides the graph editor tab and future extensible UI tabs.
+// Description: Main editor toolkit for ConversationAsset. Handles tab layout,
+//              graph editor, details panel, runtime sync, and undo/redo hooks.
 // ============================================================================
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Toolkits/AssetEditorToolkit.h"
+#include "Misc/NotifyHook.h"
+#include "EditorUndoClient.h"        // << REQUIRED for Undo/Redo
 
 class UConversationAsset;
-class UEdGraph;
+class UConversationEdGraph;
 class SGraphEditor;
+class IDetailsView;
 
 /**
- * FConversationEditorToolkit
- *
- * Standalone editor used by the engine to open and edit
- * UConversationAsset instances. This toolkit manages window layout,
- * tab registration, menus/toolbars, and creation of the graph editor.
+ * Editor toolkit for Conversation Assets.
+ * Provides:
+ *  - Graph editing interface
+ *  - Details panel
+ *  - Undo/Redo handling via FEditorUndoClient
+ *  - Runtime sync on save/close
+ *  - Stable two-tab layout
  */
-class FConversationEditorToolkit : public FAssetEditorToolkit, public FNotifyHook
+class FConversationEditorToolkit
+    : public FAssetEditorToolkit
+    , public FNotifyHook
+    , public FEditorUndoClient       // << REQUIRED
 {
 public:
 
-    /** Constructor */
     FConversationEditorToolkit();
+    virtual ~FConversationEditorToolkit();
 
-    /** Destructor */
-    virtual ~FConversationEditorToolkit() override;
+    /** Initializes the editor for a Conversation Asset */
+    void InitConversationEditor(
+        const EToolkitMode::Type Mode,
+        const TSharedPtr<IToolkitHost>& InitToolkitHost,
+        UConversationAsset* Asset);
 
-    /**
-     * Initialize the editor for a Conversation Asset.
-     *
-     * @param InitToolkitHost   Optional host if being used world-centrically.
-     * @param Asset             The Conversation Asset this editor will modify.
-     */
-    void InitConversationEditor(const TSharedPtr<class IToolkitHost>& InitToolkitHost, UConversationAsset* Asset);
-
-    /*
-     *FAssetEditorToolkit Interface
-     */
-
-     /** Returns the internal name of this toolkit */
+    // -------- FAssetEditorToolkit overrides --------
     virtual FName GetToolkitFName() const override;
-
-    /** Returns the label that appears in the editor tab */
     virtual FText GetBaseToolkitName() const override;
-
-    /** Returns the full name including asset being edited */
     virtual FText GetToolkitName() const override;
+    virtual void SaveAsset_Execute() override;
+    virtual void OnClose() override;
 
-    /** Prefix used when this editor is world-centric */
-    virtual FString GetWorldCentricTabPrefix() const override;
-
-    /** Color used when this editor is displayed world-centrically */
-    virtual FLinearColor GetWorldCentricTabColorScale() const override;
-
+    // -------- Tab Management --------
     virtual void RegisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager) override;
-
     virtual void UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager) override;
 
-    virtual void SaveAsset_Execute() override;
-    
-    void OnGraphSelectionChanged(const FGraphPanelSelectionSet& Selection);
-
-    /*
-     *  Tabs
-    */
-
-    /** Tab ID for the Graph Editor tab */
-    static const FName GraphEditorTabId;
-
-    /** Tab ID for the Details tab */
-    static const FName DetailsTabID;
-
-protected:
-
-    /**
-     * Creates the Slate graph editor widget.
-     * This binds the UEdGraph stored inside the asset to SGraphEditor.
-     */
-    TSharedRef<SWidget> CreateGraphEditor();
-
-    /**
-     * Called by the TabManager when the Graph tab is created.
-     *
-     * @param Args Spawn arguments describing how the tab should be created.
-     */
-    TSharedRef<SDockTab> SpawnGraphEditorTab(const FSpawnTabArgs& Args);
-
-    /**
-     * Called by the TabManager when the Details tab is created.
-     *
-     * @param Args Spawn arguments describing how the tab should be created.
-     */
+    TSharedRef<SDockTab> SpawnTab_Graph(const FSpawnTabArgs& Args);
     TSharedRef<SDockTab> SpawnTab_Details(const FSpawnTabArgs& Args);
+
+    virtual FString GetWorldCentricTabPrefix() const override;
+    virtual FLinearColor GetWorldCentricTabColorScale() const override;
+
+    // -------- Undo/Redo Handling --------
+    virtual void PostUndo(bool bSuccess) override;     // << OVERRIDE NOW VALID
+    virtual void PostRedo(bool bSuccess) override;     // << OVERRIDE NOW VALID
+
+    // -------- Graph/Details --------
+    void OnGraphSelectionChanged(const FGraphPanelSelectionSet& Selection);
+    void RefreshDetailsPanel();
 
 private:
 
-    /** The ConversationAsset currently being edited */
-    UConversationAsset* EditingAsset = nullptr;
+    TSharedRef<SGraphEditor> CreateGraphEditorWidget();
+    void BuildEditorLayout();
 
-    /** The UEdGraph used by the graph editor */
-    UEdGraph* EditingGraph = nullptr;
+private:
 
+    TObjectPtr<UConversationAsset> EditingAsset;
+
+    TSharedPtr<SGraphEditor> GraphEditor;
     TSharedPtr<IDetailsView> DetailsView;
 
-    /** Slate graph editor widget instance */
-    TSharedPtr<SGraphEditor> GraphEditor;
+    TSharedPtr<FTabManager::FLayout> EditorLayout;
+    TSharedPtr<FUICommandList> GraphEditorCommands;
 
-    TSharedPtr<FWorkspaceItem> WorkspaceMenuCategory;
+    static const FName GraphTabId;
+    static const FName DetailsTabId;
+
+    /** DELETE command handler */
+    void HandleDeleteSelectedNodes();
+    bool CanDeleteSelectedNodes() const;
 };

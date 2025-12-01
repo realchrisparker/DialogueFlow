@@ -4,56 +4,43 @@
 //
 // Project: Dialogue Flow
 // File: ConversationGraphStartNode.cpp
-// Description: Editor graph node representing a Start node.
+// Description: Implementation of the Start Node for Dialogue Flow.
 // ============================================================================
 
-#include <Graph/Nodes/ConversationGraphStartNode.h>
-#include <Graph/Nodes/SConversationGraphStartNode.h>
+#include "Graph/Nodes/ConversationGraphStartNode.h"
 #include "EdGraph/EdGraphPin.h"
-
-
-#define LOCTEXT_NAMESPACE "ConversationGraphNodes"
 
 UConversationGraphStartNode::UConversationGraphStartNode(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
+    NodeClassName = "Start";
 }
 
 void UConversationGraphStartNode::AllocateDefaultPins()
 {
+    // Base class creates In + Out pins
     Super::AllocateDefaultPins();
 
-    // Remove input pin for Start node
-    if (UEdGraphPin* InputPin = FindPin(PinInput))
+    // Remove input pin — start node cannot have input
+    if (UEdGraphPin* InPin = FindPin(FName("In"), EGPD_Input))
     {
-        RemovePin(InputPin);
+        Pins.Remove(InPin);
     }
 }
 
-FText UConversationGraphStartNode::GetNodeTitle(ENodeTitleType::Type TitleType) const
+void UConversationGraphStartNode::PostEditUndo()
 {
-    return LOCTEXT("StartConversationTitle", "Start Conversation");
+    Super::PostEditUndo();
+
+    ReconstructNode();
+
+    if (UEdGraph* Graph = GetGraph())
+    {
+        Graph->NotifyGraphChanged();
+    }
 }
 
-FLinearColor UConversationGraphStartNode::GetNodeTitleColor() const
-{
-    return FLinearColor(0.20f, 0.65f, 1.0f); // Blue-ish for Start
-}
-
-FText UConversationGraphStartNode::GetTooltipText() const
-{
-    return LOCTEXT("StartNodeTooltip", "Entry point for the conversation.");
-}
-
-FSlateIcon UConversationGraphStartNode::GetIconAndTint(FLinearColor& OutColor) const
-{
-    OutColor = FLinearColor(0.20f, 0.65f, 1.0f);
-    return FSlateIcon(FAppStyle::GetAppStyleSetName(), "GraphEditor.Event_16x");
-}
-
-TSharedPtr<SGraphNode> UConversationGraphStartNode::CreateVisualWidget()
-{
-    return SNew(SConversationGraphStartNode, this);
-}
-
-#undef LOCTEXT_NAMESPACE
+// TSharedRef<SGraphNode> UConversationGraphStartNode::CreateVisualWidget()
+// {
+//     return SNew(SConversationGraphStartNode, this);
+// }

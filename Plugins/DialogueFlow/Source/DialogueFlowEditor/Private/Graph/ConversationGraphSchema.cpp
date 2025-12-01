@@ -3,200 +3,181 @@
 // All Rights Reserved.
 //
 // Project: Dialogue Flow
-// File: ConversationGraphSchema.cpp
-// Description: Graph schema defining rules and behavior for dialogue graphs.
+// File: ConversationGraphSchema.h
+// Description: Schema controlling rules for pin linking, node creation,
+//              and context-menu actions for Dialogue Flow Editor.
 // ============================================================================
 
-#include <Graph/ConversationGraphSchema.h>
-#include <Graph/ConversationEdGraph.h>
-#include <Graph/Actions/ConversationGraphSchemaAction.h>
-#include <Graph/Nodes/ConversationGraphStartNode.h>
-#include <Graph/Nodes/ConversationGraphEndNode.h>
-#include <Graph/Nodes/ConversationGraphDialogueNode.h>
-#include "EdGraph/EdGraph.h"
-#include "GraphEditor.h"
-#include "GraphEditorActions.h"
-#include "ToolMenu.h"
-#include "ToolMenuSection.h"
-#include "EdGraph/EdGraphNode.h"
+#include "Graph/ConversationGraphSchema.h"
+#include "Graph/Nodes/ConversationGraphNode.h"
+#include "Graph/Nodes/ConversationGraphStartNode.h"
+#include "Graph/Nodes/ConversationGraphEndNode.h"
+#include "Graph/Nodes/ConversationGraphDialogueNode.h"
 #include "Framework/Commands/GenericCommands.h"
+#include "GraphEditorActions.h"   // Required for FGraphEditorCommands
+#include "EdGraph/EdGraphPin.h"
 
-#define LOCTEXT_NAMESPACE "DialogueFlowGraphSchema"
+
+#define LOCTEXT_NAMESPACE "ConversationGraphSchema"
+
 
 void UConversationGraphSchema::GetGraphContextActions(FGraphContextMenuBuilder& ContextMenuBuilder) const
 {
-    AddNodeActions(ContextMenuBuilder);
-}
+	// CATEGORY: Dialogue
+	const FText Category = NSLOCTEXT("DialogueFlow", "DialogueNodes", "Dialogue");
 
-void UConversationGraphSchema::AddNodeActions(FGraphContextMenuBuilder& ContextMenuBuilder) const
-{
-    // Add Dialogue Node
-    {
-        TSharedPtr<FConversationGraphSchemaAction_NewNode> Action =
-            MakeShared<FConversationGraphSchemaAction_NewNode>(
-                FText::FromString("Dialogue Nodes"),
-                FText::FromString("Dialogue"),
-                FText::FromString("Create a Dialogue Node."),
-                0,
-                UConversationGraphDialogueNode::StaticClass()
-            );
+	// Add Dialogue Node
+	{
+		TSharedPtr<FEdGraphSchemaAction> Action = MakeShareable(
+			new FEdGraphSchemaAction_NewNode(
+				Category,
+				NSLOCTEXT("DialogueFlow", "AddDialogueNode", "Dialogue Node"),
+				NSLOCTEXT("DialogueFlow", "AddDialogueNodeTooltip", "Adds a new Dialogue node."),
+				0));
 
-        ContextMenuBuilder.AddAction(Action);
-    }
+		UConversationGraphDialogueNode* Template = NewObject<UConversationGraphDialogueNode>(ContextMenuBuilder.OwnerOfTemporaries);
+		((FEdGraphSchemaAction_NewNode*)Action.Get())->NodeTemplate = Template;
 
-    // Start Node (commented out to prevent multiple start nodes)
-    // {
-    //     TSharedPtr<FConversationGraphSchemaAction_NewNode> Action =
-    //         MakeShared<FConversationGraphSchemaAction_NewNode>(
-    //             FText::FromString("Dialogue Nodes"),
-    //             FText::FromString("Start Node"),
-    //             FText::FromString("Create a Start Node."),
-    //             0,
-    //             UConversationGraphStartNode::StaticClass()
-    //         );
+		ContextMenuBuilder.AddAction(Action);
+	}
 
-    //     ContextMenuBuilder.AddAction(Action);
-    // }
+	// Add End Node
+	// {
+	// 	TSharedPtr<FEdGraphSchemaAction> Action = MakeShareable(
+	// 		new FEdGraphSchemaAction_NewNode(
+	// 			Category,
+	// 			NSLOCTEXT("DialogueFlow", "AddEndNode", "End Node"),
+	// 			NSLOCTEXT("DialogueFlow", "AddEndNodeTooltip", "Adds a new End node."),
+	// 			1));
 
-    // End Node (commented out to prevent multiple end nodes. If we ever add the ability to have multiple start nodes, we should do the same for end nodes)
-    // {
-    //     TSharedPtr<FConversationGraphSchemaAction_NewNode> Action =
-    //         MakeShared<FConversationGraphSchemaAction_NewNode>(
-    //             FText::FromString("Dialogue Nodes"),
-    //             FText::FromString("End Node"),
-    //             FText::FromString("Create an End Node."),
-    //             0,
-    //             UConversationGraphEndNode::StaticClass()
-    //         );
+	// 	UConversationGraphEndNode* Template = NewObject<UConversationGraphEndNode>(ContextMenuBuilder.OwnerOfTemporaries);
+	// 	((FEdGraphSchemaAction_NewNode*)Action.Get())->NodeTemplate = Template;
 
-    //     ContextMenuBuilder.AddAction(Action);
-    // }
-}
-
-void UConversationGraphSchema::GetContextMenuActions(UToolMenu* Menu, UGraphNodeContextMenuContext* Context) const
-{
-    if (Context->Node)
-    {
-        FToolMenuSection& Section = Menu->AddSection("NodeActions", LOCTEXT("NodeActions", "Node Actions"));
-        Section.AddMenuEntry("DeleteNode", LOCTEXT("DeleteNode", "Delete"), LOCTEXT("DeleteNode_Tooltip", "Delete this node."),
-            FSlateIcon(),
-            FUIAction(FExecuteAction::CreateLambda([ Context ] ()
-                {
-                    if (UEdGraph* Graph = const_cast<UEdGraph*>(Context->Graph.Get()))
-                    {
-                        if (UEdGraphNode* Node = const_cast<UEdGraphNode*>(Context->Node.Get()))
-                        {
-                            Graph->RemoveNode(Node);
-                        }
-                    }
-                }))
-        );
-
-        FToolMenuSection& AddNodeSection = Menu->AddSection("AddDialogueNode", LOCTEXT("AddDialogueNode", "Dialogue Nodes"));
-
-        AddNodeSection.AddMenuEntry(
-            "AddDialogueNodeEntry",
-            LOCTEXT("AddDialogueNodeEntry", "Add Dialogue Node"),
-            LOCTEXT("AddDialogueNodeEntry_Tooltip", "Create a new Dialogue Node."),
-            FSlateIcon(),
-            FUIAction(FExecuteAction::CreateLambda([ Context ] ()
-                {
-                    if (UEdGraph* Graph = const_cast<UEdGraph*>(Context->Graph.Get()))
-                    {
-                        // Get a good placement location for the new node
-                        const FVector2D NodePos = FVector2D(Graph->GetGoodPlaceForNewNode());
-
-                        FGraphNodeCreator<UConversationGraphDialogueNode> Creator(*Graph);
-                        UConversationGraphDialogueNode* NewNode = Creator.CreateNode();
-                        NewNode->NodePosX = NodePos.X;
-                        NewNode->NodePosY = NodePos.Y;
-                        Creator.Finalize();
-                    }
-                }))
-        );
-    }
+	// 	ContextMenuBuilder.AddAction(Action);
+	// }
 }
 
 const FPinConnectionResponse UConversationGraphSchema::CanCreateConnection(const UEdGraphPin* A, const UEdGraphPin* B) const
 {
-    // Basic sanity
-    if (A == B)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("Cannot connect a pin to itself.")
-        );
-    }
+	if (A == B)
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Cannot connect pin to itself."));
 
-    if (A->Direction == B->Direction)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("Pins must be opposite directions.")
-        );
-    }
+	if (A->Direction == B->Direction)
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Pins must be opposite directions."));
 
-    // *** IMPORTANT: use editor graph nodes, not runtime nodes ***
-    UConversationGraphNode* NodeA = Cast<UConversationGraphNode>(A->GetOwningNode());
-    UConversationGraphNode* NodeB = Cast<UConversationGraphNode>(B->GetOwningNode());
+	UConversationGraphNode* NodeA = Cast<UConversationGraphNode>(A->GetOwningNode());
+	UConversationGraphNode* NodeB = Cast<UConversationGraphNode>(B->GetOwningNode());
 
-    if (!NodeA || !NodeB)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("Only conversation graph nodes are supported.")
-        );
-    }
+	if (!NodeA || !NodeB)
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Invalid node types."));
 
-    // ---- START NODE RULE ----
-    if (NodeA->IsA(UConversationGraphStartNode::StaticClass()) &&
-        A->Direction == EGPD_Input)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("Start node cannot have inputs.")
-        );
-    }
+	// Start node cannot have inputs
+	if ((NodeA->IsA(UConversationGraphStartNode::StaticClass()) && A->Direction == EGPD_Input) ||
+		(NodeB->IsA(UConversationGraphStartNode::StaticClass()) && B->Direction == EGPD_Input))
+	{
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Start node cannot have inputs."));
+	}
 
-    if (NodeB->IsA(UConversationGraphStartNode::StaticClass()) &&
-        B->Direction == EGPD_Input)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("Start node cannot have inputs.")
-        );
-    }
+	// End node cannot have outputs
+	if ((NodeA->IsA(UConversationGraphEndNode::StaticClass()) && A->Direction == EGPD_Output) ||
+		(NodeB->IsA(UConversationGraphEndNode::StaticClass()) && B->Direction == EGPD_Output))
+	{
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("End node cannot have outputs."));
+	}
 
-    // ---- END NODE RULE ----
-    if (NodeA->IsA(UConversationGraphEndNode::StaticClass()) &&
-        A->Direction == EGPD_Output)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("End nodes cannot have outputs.")
-        );
-    }
-
-    if (NodeB->IsA(UConversationGraphEndNode::StaticClass()) &&
-        B->Direction == EGPD_Output)
-    {
-        return FPinConnectionResponse(
-            CONNECT_RESPONSE_DISALLOW,
-            TEXT("End nodes cannot have outputs.")
-        );
-    }
-
-    // Everything else is fine
-    return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, TEXT(""));
+	// Everything else allowed
+	return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, TEXT(""));
 }
 
-void UConversationGraphSchema::CreateDefaultNodesForGraph(UEdGraph& Graph) const
+bool UConversationGraphSchema::TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) const
 {
-    FGraphNodeCreator<UConversationGraphStartNode> Creator(Graph);
-    UConversationGraphStartNode* Node = Creator.CreateNode();
-    Node->NodePosX = -200;
-    Node->NodePosY = 0;
-    Creator.Finalize();
+	const FPinConnectionResponse Resp = CanCreateConnection(A, B);
+
+	if (Resp.Response == CONNECT_RESPONSE_MAKE)
+	{
+		A->MakeLinkTo(B);
+		return true;
+	}
+
+	return false;
+}
+
+void UConversationGraphSchema::GetContextMenuActions(
+	UToolMenu* Menu,
+	UGraphNodeContextMenuContext* Context) const
+{
+	if (!Menu || !Context)
+	{
+		return;
+	}
+
+	// Node actions (Delete)
+	if (const UEdGraphNode* Node = Context->Node)
+	{
+		FToolMenuSection& Section = Menu->AddSection("ConversationNodeActions", LOCTEXT("NodeActions", "Node"));
+
+		// CanUserDeleteNode() is const, so this works fine with const UEdGraphNode*
+		if (Node->CanUserDeleteNode())
+		{
+			Section.AddMenuEntry(FGenericCommands::Get().Delete);
+		}
+	}
+
+	// -----------------------------------------------------
+	// Pin actions (Break Links)
+	// -----------------------------------------------------
+	if (const UEdGraphPin* Pin = Context->Pin)
+	{
+		if (Pin->LinkedTo.Num() > 0)
+		{
+			FToolMenuSection& Section = Menu->AddSection("ConversationPinActions", LOCTEXT("PinActions", "Pin"));
+			Section.AddMenuEntry(FGraphEditorCommands::Get().BreakPinLinks);
+		}
+	}
+
+	// Background actions (Add Dialogue Node)
+	if (!Context->Node && !Context->Pin)
+	{
+		FGraphContextMenuBuilder Builder(Context->Graph);
+		GetGraphContextActions(Builder); // Your existing Dialogue/End actions
+
+		// Pull actions into the ToolMenu
+		FToolMenuSection& Section = Menu->AddSection("ConversationAddNode", LOCTEXT("AddNode", "Add Node"));
+
+		const int32 NumActions = Builder.GetNumActions();
+		for (int32 i = 0; i < NumActions; ++i)
+		{
+			TSharedPtr<FEdGraphSchemaAction> Action = Builder.GetSchemaAction(i);
+			if (!Action.IsValid())
+				continue;
+
+			FText MenuDesc = Action->GetMenuDescription();
+			FText Tooltip = Action->GetTooltipDescription();
+
+			Section.AddMenuEntry(
+				NAME_None,
+				MenuDesc,
+				Tooltip,
+				FSlateIcon(),
+				FUIAction(FExecuteAction::CreateLambda(
+					[ Action, Context ] ()
+					{
+						const UEdGraph* ConstGraph = Context->Graph.Get();
+						UEdGraph* MutableGraph = const_cast<UEdGraph*>(ConstGraph);
+
+						// UE 5.6 does NOT provide click location in UGraphNodeContextMenuContext
+						const FVector2f SpawnPos(0.f, 0.f);
+
+						Action->PerformAction(
+							MutableGraph,
+							nullptr,
+							SpawnPos,
+							true
+						);
+					}))
+			);
+		}
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

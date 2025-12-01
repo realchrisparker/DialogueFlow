@@ -36,6 +36,6 @@ void FConversationAssetTypeActions::OpenAssetEditor(
             MakeShared<FConversationEditorToolkit>();
 
         // Initialize the custom editor
-        EditorToolkit->InitConversationEditor(EditWithinLevelEditor, Asset);
+        EditorToolkit->InitConversationEditor(EToolkitMode::Standalone, EditWithinLevelEditor, Asset);
     }
 }
