@@ -13,12 +13,13 @@
 #include "CoreMinimal.h"
 #include "Toolkits/AssetEditorToolkit.h"
 #include "Misc/NotifyHook.h"
-#include "EditorUndoClient.h"        // << REQUIRED for Undo/Redo
+#include "EditorUndoClient.h" 
 
 class UConversationAsset;
 class UConversationEdGraph;
 class SGraphEditor;
 class IDetailsView;
+
 
 /**
  * Editor toolkit for Conversation Assets.
@@ -32,7 +33,7 @@ class IDetailsView;
 class FConversationEditorToolkit
     : public FAssetEditorToolkit
     , public FNotifyHook
-    , public FEditorUndoClient       // << REQUIRED
+    , public FEditorUndoClient 
 {
 public:
 

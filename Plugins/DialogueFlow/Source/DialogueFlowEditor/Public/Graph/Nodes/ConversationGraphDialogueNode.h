@@ -46,7 +46,10 @@ public:
 
     /** Returns the underlying runtime dialogue node. */
     UFUNCTION()
-    UDialogueFlowDialogueNode* GetDialogueNode() const;
+    UDialogueFlowDialogueNode* GetDialogueNode() const
+    {
+        return Cast<UDialogueFlowDialogueNode>(GetNodeData());
+    }
 
 protected:
 

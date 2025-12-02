@@ -13,6 +13,9 @@
 #include <Graph/Nodes/ConversationGraphStartNode.h>
 #include <Graph/Nodes/ConversationGraphEndNode.h>
 #include <Assets/ConversationAsset.h>
+#include <Nodes/DialogueFlowStartNode.h>
+#include <Nodes/DialogueFlowEndNode.h>
+#include <Nodes/DialogueFlowDialogueNode.h>
 
 /*
  * Constructor
@@ -59,6 +62,11 @@ UObject* UConversationAssetFactory::FactoryCreateNew(
         UConversationGraphStartNode* StartNode = Creator.CreateNode(false);
         StartNode->NodePosX = -200;
         StartNode->NodePosY = 0;
+
+        UDialogueFlowStartNode* StartData = NewObject<UDialogueFlowStartNode>(NewAsset, UDialogueFlowStartNode::StaticClass(), NAME_None, RF_Transactional);
+        NewAsset->Nodes.Add(StartData);
+        StartNode->SetNodeData(StartData);
+
         Creator.Finalize();
     }
 
@@ -68,6 +76,11 @@ UObject* UConversationAssetFactory::FactoryCreateNew(
         UConversationGraphEndNode* EndNode = Creator.CreateNode(false);
         EndNode->NodePosX = 400;
         EndNode->NodePosY = 0;
+
+        UDialogueFlowEndNode* EndData = NewObject<UDialogueFlowEndNode>(NewAsset, UDialogueFlowEndNode::StaticClass(), NAME_None, RF_Transactional);
+        NewAsset->Nodes.Add(EndData);
+        EndNode->SetNodeData(EndData);
+
         Creator.Finalize();
     }
 

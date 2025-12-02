@@ -1,6 +1,20 @@
+// ============================================================================
+// Copyright © 2025 God's Studio
+// All Rights Reserved.
+//
+// Project: Dialogue Flow
+// File: ConversationEditorToolkit.cpp
+// Description: Main editor toolkit for ConversationAsset. Handles tab layout,
+//              graph editor, details panel, runtime sync, and undo/redo hooks.
+// ============================================================================
+
+
 #include <Editor/ConversationEditorToolkit.h>
 #include <Assets/ConversationAsset.h>
 #include <Graph/ConversationEdGraph.h>
+#include <Graph/Nodes/ConversationGraphNode.h>
+#include "Nodes/DialogueFlowBaseNode.h"
+#include "Nodes/DialogueFlowDialogueNode.h"
 
 #include "PropertyEditorModule.h"
 #include "Modules/ModuleManager.h"
@@ -12,6 +26,7 @@
 
 #define LOCTEXT_NAMESPACE "FConversationEditorToolkit"
 
+class UDialogueFlowBaseNode; 
 
 // Static Tab Ids
 const FName FConversationEditorToolkit::GraphTabId(TEXT("ConversationEditor_Graph"));
@@ -205,24 +220,42 @@ TSharedRef<SGraphEditor> FConversationEditorToolkit::CreateGraphEditorWidget()
 
 
 // Selection → Details Panel
-void FConversationEditorToolkit::OnGraphSelectionChanged(
-    const FGraphPanelSelectionSet& Selection)
+void FConversationEditorToolkit::OnGraphSelectionChanged(const FGraphPanelSelectionSet& Selection)
 {
     if (!DetailsView.IsValid())
         return;
 
+    // No selection → show asset details
+    if (Selection.Num() == 0)
+    {
+        DetailsView->SetObject(EditingAsset);
+        return;
+    }
+
+    // Single selection
     if (Selection.Num() == 1)
     {
         UObject* SelectedObj = nullptr;
         for (UObject* Obj : Selection)
             SelectedObj = Obj;
 
+        // If a graph node is selected, show its underlying DATA node
+        if (UConversationGraphNode* GraphNode = Cast<UConversationGraphNode>(SelectedObj))
+        {
+            if (UDialogueFlowBaseNode* DataNode = GraphNode->GetNodeData())
+            {
+                DetailsView->SetObject(DataNode);
+                return;
+            }
+        }
+
+        // Otherwise show the UObject itself
         DetailsView->SetObject(SelectedObj);
+        return;
     }
-    else
-    {
-        DetailsView->SetObject(EditingAsset);
-    }
+
+    // Multi-selection → default to the asset
+    DetailsView->SetObject(EditingAsset);
 }
 
 void FConversationEditorToolkit::RefreshDetailsPanel()

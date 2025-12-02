@@ -26,7 +26,7 @@ void UConversationGraphDialogueNode::AllocateDefaultPins()
 	CreatePin(EGPD_Input, TEXT("DialogueFlow"), FName("In"));
 
 	// Runtime node controls how many output pins exist
-	UDialogueFlowDialogueNode* Runtime = GetDialogueNode();
+	UDialogueFlowDialogueNode* Runtime = Cast<UDialogueFlowDialogueNode>(GetNodeData());
 	const int32 NumChoices = Runtime ? Runtime->Choices.Num() : 0;
 
 	for (int32 i = 0; i < NumChoices; i++)
@@ -69,11 +69,6 @@ void UConversationGraphDialogueNode::PostEditUndo()
 	}
 }
 
-UDialogueFlowDialogueNode* UConversationGraphDialogueNode::GetDialogueNode() const
-{
-	return Cast<UDialogueFlowDialogueNode>(GetNodeData());
-}
-
 void UConversationGraphDialogueNode::RestoreDynamicConnections(const TArray<UEdGraphPin*>& OldPins)
 {
 	TMap<FGuid, UEdGraphPin*> OldMap;
@@ -105,7 +100,7 @@ void UConversationGraphDialogueNode::RestoreDynamicConnections(const TArray<UEdG
 
 void UConversationGraphDialogueNode::SyncPinNamesToChoices()
 {
-	UDialogueFlowDialogueNode* Runtime = GetDialogueNode();
+	UDialogueFlowDialogueNode* Runtime = Cast<UDialogueFlowDialogueNode>(GetNodeData());
 	if (!Runtime) return;
 
 	int32 OutIndex = 0;

@@ -1,5 +1,11 @@
+
 #include <Graph/Actions/ConversationGraphSchemaAction.h>
 #include <Graph/Nodes/ConversationGraphNode.h>
+#include <Graph/Nodes/ConversationGraphDialogueNode.h>
+#include <Graph/ConversationEdGraph.h>
+#include <Nodes/DialogueFlowBaseNode.h>
+#include <Nodes/DialogueFlowDialogueNode.h>
+#include <Assets/ConversationAsset.h>
 #include "EdGraph/EdGraph.h"
 
 
@@ -12,37 +18,72 @@ UEdGraphNode* FConversationGraphSchemaAction_NewNode::PerformAction(
     const FVector2D Location,
     bool bSelectNewNode)
 {
-    if (!GraphNodeClass || !ParentGraph)
-        return nullptr;
-
-    // Create the node object as a child of the graph
-    UEdGraphNode* NewNode = NewObject<UEdGraphNode>(
-        ParentGraph,
-        GraphNodeClass,
-        NAME_None,
-        RF_Transactional
-    );
-
-    // Add to graph structure
-    ParentGraph->AddNode(NewNode, bSelectNewNode, bSelectNewNode);
-
-    // Set position
-    NewNode->NodePosX = Location.X;
-    NewNode->NodePosY = Location.Y;
-
-    // Allocate default pins
-    NewNode->AllocateDefaultPins();
-
-    // Auto-wire output → input
-    if (FromPin && FromPin->Direction == EGPD_Output)
+    if (!ParentGraph || !GraphNodeClass)
     {
-        if (UEdGraphPin* InputPin = NewNode->FindPin(TEXT("In")))
-        {
-            FromPin->MakeLinkTo(InputPin);
-        }
+        return nullptr;
     }
 
-    return NewNode;
+    const FScopedTransaction Transaction(
+        NSLOCTEXT("ConversationGraph", "AddDialogueNode", "Add Dialogue Node")
+    );
+
+    ParentGraph->Modify();
+
+    // ------------------------------
+    // Get the owning ConversationAsset
+    // ------------------------------
+    UConversationAsset* ConversationAsset = Cast<UConversationAsset>(ParentGraph->GetOuter());
+    if (!ConversationAsset)
+    {
+        return nullptr;
+    }
+
+    ConversationAsset->Modify();
+
+    // ------------------------------
+    // Create the graph node
+    // ------------------------------
+    FGraphNodeCreator<UConversationGraphDialogueNode> Creator(*ParentGraph);
+    UConversationGraphDialogueNode* NewGraphNode = Creator.CreateNode(bSelectNewNode);
+
+    if (!NewGraphNode)
+    {
+        Creator.Finalize();
+        return nullptr;
+    }
+
+    NewGraphNode->NodePosX = Location.X;
+    NewGraphNode->NodePosY = Location.Y;
+
+    NewGraphNode->AutowireNewNode(FromPin);
+    NewGraphNode->AllocateDefaultPins();
+
+    Creator.Finalize();
+
+    // ------------------------------
+    // Create the runtime dialogue node
+    // ------------------------------
+    UDialogueFlowDialogueNode* NewRuntimeNode =
+        NewObject<UDialogueFlowDialogueNode>(
+            ConversationAsset,
+            UDialogueFlowDialogueNode::StaticClass(),
+            NAME_None,
+            RF_Transactional
+        );
+
+    if (NewRuntimeNode)
+    {
+        // Add runtime node to asset
+        int32 NewIndex = ConversationAsset->Nodes.Add(NewRuntimeNode);
+
+        // Give it a default title
+        NewRuntimeNode->NodeTitle = FText::FromString(TEXT("Dialogue Node"));
+
+        // Link graph node ←→ runtime node
+        NewGraphNode->SetNodeData(NewRuntimeNode);
+    }
+
+    ParentGraph->NotifyGraphChanged();
+
+    return NewGraphNode;
 }
-
-

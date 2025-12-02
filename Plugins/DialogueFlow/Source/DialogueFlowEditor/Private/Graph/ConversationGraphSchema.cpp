@@ -8,13 +8,18 @@
 //              and context-menu actions for Dialogue Flow Editor.
 // ============================================================================
 
-#include "Graph/ConversationGraphSchema.h"
-#include "Graph/Nodes/ConversationGraphNode.h"
-#include "Graph/Nodes/ConversationGraphStartNode.h"
-#include "Graph/Nodes/ConversationGraphEndNode.h"
-#include "Graph/Nodes/ConversationGraphDialogueNode.h"
+#include <Graph/ConversationGraphSchema.h>
+#include <Graph/Nodes/ConversationGraphNode.h>
+#include <Graph/Nodes/ConversationGraphStartNode.h>
+#include <Graph/Nodes/ConversationGraphEndNode.h>
+#include <Graph/Nodes/ConversationGraphDialogueNode.h>
+#include <Nodes/DialogueFlowStartNode.h>
+#include <Nodes/DialogueFlowEndNode.h>
+#include <Nodes/DialogueFlowDialogueNode.h>
+#include <Assets/ConversationAsset.h>
+#include <Graph/Actions/ConversationGraphSchemaAction.h>
 #include "Framework/Commands/GenericCommands.h"
-#include "GraphEditorActions.h"   // Required for FGraphEditorCommands
+#include "GraphEditorActions.h"  
 #include "EdGraph/EdGraphPin.h"
 
 
@@ -28,15 +33,24 @@ void UConversationGraphSchema::GetGraphContextActions(FGraphContextMenuBuilder& 
 
 	// Add Dialogue Node
 	{
-		TSharedPtr<FEdGraphSchemaAction> Action = MakeShareable(
-			new FEdGraphSchemaAction_NewNode(
+		// TSharedPtr<FEdGraphSchemaAction> Action = MakeShareable(
+		// 	new FEdGraphSchemaAction_NewNode(
+		// 		Category,
+		// 		NSLOCTEXT("DialogueFlow", "AddDialogueNode", "Dialogue Node"),
+		// 		NSLOCTEXT("DialogueFlow", "AddDialogueNodeTooltip", "Adds a new Dialogue node."),
+		// 		0));
+
+		// UConversationGraphDialogueNode* Template = NewObject<UConversationGraphDialogueNode>(ContextMenuBuilder.OwnerOfTemporaries);
+		// ((FEdGraphSchemaAction_NewNode*)Action.Get())->NodeTemplate = Template;
+
+		TSharedPtr<FConversationGraphSchemaAction_NewNode> Action =
+			MakeShareable(new FConversationGraphSchemaAction_NewNode(
 				Category,
 				NSLOCTEXT("DialogueFlow", "AddDialogueNode", "Dialogue Node"),
 				NSLOCTEXT("DialogueFlow", "AddDialogueNodeTooltip", "Adds a new Dialogue node."),
-				0));
-
-		UConversationGraphDialogueNode* Template = NewObject<UConversationGraphDialogueNode>(ContextMenuBuilder.OwnerOfTemporaries);
-		((FEdGraphSchemaAction_NewNode*)Action.Get())->NodeTemplate = Template;
+				0,
+				UConversationGraphDialogueNode::StaticClass()   // important
+			));
 
 		ContextMenuBuilder.AddAction(Action);
 	}
@@ -165,15 +179,52 @@ void UConversationGraphSchema::GetContextMenuActions(
 						const UEdGraph* ConstGraph = Context->Graph.Get();
 						UEdGraph* MutableGraph = const_cast<UEdGraph*>(ConstGraph);
 
-						// UE 5.6 does NOT provide click location in UGraphNodeContextMenuContext
+						// Runtime spawn position (UE 5.6 gives no cursor position)
 						const FVector2f SpawnPos(0.f, 0.f);
 
-						Action->PerformAction(
+						// 1) Create the graph node via standard schema action
+						UEdGraphNode* RawNode = Action->PerformAction(
 							MutableGraph,
 							nullptr,
 							SpawnPos,
 							true
 						);
+
+						UConversationGraphDialogueNode* GraphNode =
+							Cast<UConversationGraphDialogueNode>(RawNode);
+
+						if (!GraphNode)
+						{
+							return; // Not a dialogue node; nothing more to do
+						}
+
+						// 2) Get the owning asset (Graph->GetOuter())
+						UObject* OuterObj = MutableGraph->GetOuter();
+						UConversationAsset* Asset = Cast<UConversationAsset>(OuterObj);
+
+						if (!Asset)
+						{
+							return; // Should never happen; safety check
+						}
+
+						// 3) Create runtime DATA node (owned by the asset)
+						UDialogueFlowDialogueNode* DataNode =
+							NewObject<UDialogueFlowDialogueNode>(
+								Asset,
+								UDialogueFlowDialogueNode::StaticClass(),
+								NAME_None,
+								RF_Transactional
+							);
+
+						// 4) Attach runtime node to asset
+						Asset->Nodes.Add(DataNode);
+
+						// 5) Link graph-node <-> data-node
+						GraphNode->SetNodeData(DataNode);
+
+						// 6) OPTIONAL: Initialize default node fields
+						// Example: give default display text
+						DataNode->DialogueText = FText::FromString(TEXT("New Dialogue"));
 					}))
 			);
 		}

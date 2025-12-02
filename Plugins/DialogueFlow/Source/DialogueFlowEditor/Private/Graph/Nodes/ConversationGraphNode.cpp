@@ -103,11 +103,6 @@ void UConversationGraphNode::RestoreConnections()
     }
 }
 
-UDialogueFlowBaseNode* UConversationGraphNode::GetNodeData() const
-{
-    return Cast<UDialogueFlowBaseNode>(GetGraph()->GetOuter());
-}
-
 void UConversationGraphNode::PostEditUndo()
 {
     Super::PostEditUndo();

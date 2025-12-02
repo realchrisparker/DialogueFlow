@@ -71,10 +71,6 @@ void UConversationEdGraph::PostLoad()
 	EnsureStartNodeExists();
 
 	EnsureRequiredNodesExist();
-
-	// No ReconstructNode() here!
-	// Slate visual nodes are not ready during PostLoad.
-	// Doing so would destroy all custom pin widgets & context menus.
 }
 
 // VALIDATION

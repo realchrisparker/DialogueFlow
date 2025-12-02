@@ -63,6 +63,9 @@ public:
     UPROPERTY()
     FConversationNodeSavedConnection SavedConnectionData;
 
+    UPROPERTY()
+    UDialogueFlowBaseNode* RuntimeNode;
+
     // Called when pins need to be rebuilt
     virtual void AllocateDefaultPins() override;
 
@@ -77,9 +80,11 @@ public:
 
     virtual void PostEditUndo() override;
 
+    UFUNCTION()
+    UDialogueFlowBaseNode* GetNodeData() const { return RuntimeNode; }
 
     UFUNCTION()
-    UDialogueFlowBaseNode* GetNodeData() const;
+    void SetNodeData(UDialogueFlowBaseNode* InNode) { RuntimeNode = InNode; }
 
 protected:
 
