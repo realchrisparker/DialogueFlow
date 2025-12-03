@@ -9,12 +9,17 @@
 //              undo/redo reconstruction without corrupting custom Slate nodes.
 // ============================================================================
 
-#include "Graph/ConversationEdGraph.h"
-#include "Graph/ConversationGraphSchema.h"
-#include "Graph/Nodes/ConversationGraphStartNode.h"
-#include "Graph/Nodes/ConversationGraphEndNode.h"
-#include "Nodes/DialogueFlowBaseNode.h"
+#include <Graph/ConversationEdGraph.h>
+#include <Graph/ConversationGraphSchema.h>
+#include <Graph/Nodes/ConversationGraphStartNode.h>
+#include <Graph/Nodes/ConversationGraphEndNode.h>
+#include <Graph/Nodes/ConversationGraphDialogueNode.h>
+#include <Nodes/DialogueFlowBaseNode.h>
+#include <Nodes/DialogueFlowDialogueNode.h>
+#include <Structs/FDialogueChoice.h>
+#include <Assets/ConversationAsset.h>
 #include "EdGraph/EdGraphNode.h"
+
 
 UConversationEdGraph::UConversationEdGraph()
 {
@@ -70,7 +75,11 @@ void UConversationEdGraph::PostLoad()
 	// Ensure start node exists, but DO NOT reconstruct pins here
 	EnsureStartNodeExists();
 
+	// Ensure other required nodes exist
 	EnsureRequiredNodesExist();
+
+	// Rebuild asset nodes from graph
+	RebuildAssetNodesFromGraph();
 }
 
 // VALIDATION
@@ -115,6 +124,26 @@ void UConversationEdGraph::SyncEditorGraphToRuntime()
 			if (Pin->Direction != EGPD_Output)
 				continue;
 
+			// Sync runtime choice mapping using PersistentGuid. This safely assigns the correct LinkedOutputPinIndex based on
+			// GUID instead of pin naming or array order.
+			if (UConversationGraphDialogueNode* DialNode = Cast<UConversationGraphDialogueNode>(CNode))
+			{
+				if (UDialogueFlowDialogueNode* RuntimeDial = DialNode->GetDialogueNode())
+				{
+					for (int32 i = 0; i < RuntimeDial->Choices.Num(); i++)
+					{
+						FDialogueChoice& Choice = RuntimeDial->Choices[i];
+
+						// Match this editor pin by GUID
+						if (Choice.PinGuid.IsValid() && Choice.PinGuid == Pin->PersistentGuid)
+						{
+							Choice.LinkedOutputPinIndex = i;
+							break; // match found; continue with normal link logic
+						}
+					}
+				}
+			}
+
 			for (UEdGraphPin* Linked : Pin->LinkedTo)
 			{
 				if (!Linked)
@@ -131,8 +160,10 @@ void UConversationEdGraph::SyncEditorGraphToRuntime()
 			}
 		}
 	}
-}
 
+	// Rebuild asset nodes from graph
+	RebuildAssetNodesFromGraph();
+}
 
 // UNDO / REDO
 void UConversationEdGraph::PostEditUndo()
@@ -188,4 +219,26 @@ void UConversationEdGraph::EnsureRequiredNodesExist()
 		End->NodePosY = 0;
 		Creator.Finalize();
 	}
+}
+
+void UConversationEdGraph::RebuildAssetNodesFromGraph()
+{
+    UConversationAsset* Asset = Cast<UConversationAsset>(GetOuter());
+    if (!Asset)
+        return;
+
+    Asset->Modify();
+    Asset->Nodes.Empty();
+
+    // Collect all runtime nodes
+    for (UEdGraphNode* Node : Nodes)
+    {
+        if (UConversationGraphNode* CNode = Cast<UConversationGraphNode>(Node))
+        {
+            if (UDialogueFlowBaseNode* Runtime = CNode->GetNodeData())
+            {
+                Asset->Nodes.Add(Runtime);
+            }
+        }
+    }
 }

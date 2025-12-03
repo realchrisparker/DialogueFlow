@@ -77,5 +77,9 @@ public:
      */
     virtual void PostEditUndo() override;
 
+    /** Rebuilds the ConversationAsset->Nodes array from the EditorGraph nodes. */
+    void RebuildAssetNodesFromGraph();
+
+    /** Ensures required nodes (like Start Node) exist in the graph. */
     void EnsureRequiredNodesExist();
 };

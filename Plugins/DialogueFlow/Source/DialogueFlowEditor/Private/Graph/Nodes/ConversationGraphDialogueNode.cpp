@@ -63,7 +63,39 @@ void UConversationGraphDialogueNode::AllocateDefaultPins()
 			PinName = FName(*FString::Printf(TEXT("Choice_%d"), ChoiceIdx));
 		}
 
-		CreatePin(EGPD_Output, TEXT("DialogueFlow"), PinName);
+		// Create output pin for this choice
+		UEdGraphPin* NewPin = CreatePin(EGPD_Output, TEXT("DialogueFlow"), PinName);
+
+		// Ensure runtime choice has a GUID and apply it.
+		if (Runtime)
+		{
+			FDialogueChoice& Choice = Runtime->Choices[ChoiceIdx];
+
+			// Generate new GUID if choice did not previously have one
+			if (!Choice.PinGuid.IsValid())
+			{
+				Choice.PinGuid = FGuid::NewGuid();
+			}
+
+			// Assign runtime GUID → editor pin (PersistentGuid)
+			NewPin->PersistentGuid = Choice.PinGuid;
+		}
+	}
+
+	// Clean invalid LinkedTo entries
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (!Pin) continue;
+
+		for (int32 i = Pin->LinkedTo.Num() - 1; i >= 0; --i)
+		{
+			UEdGraphPin* Linked = Pin->LinkedTo[i];
+
+			if (!Linked || Linked->IsPendingKill() || !Linked->GetOwningNode())
+			{
+				Pin->LinkedTo.RemoveAt(i);
+			}
+		}
 	}
 }
 
@@ -87,6 +119,22 @@ void UConversationGraphDialogueNode::ReconstructNode()
 
 	// Make sure pin names still match the runtime choices.
 	SyncPinNamesToChoices();
+
+	// Clean invalid LinkedTo entries
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (!Pin) continue;
+
+		for (int32 i = Pin->LinkedTo.Num() - 1; i >= 0; --i)
+		{
+			UEdGraphPin* Linked = Pin->LinkedTo[i];
+
+			if (!Linked || Linked->IsPendingKill() || !Linked->GetOwningNode())
+			{
+				Pin->LinkedTo.RemoveAt(i);
+			}
+		}
+	}
 }
 
 /**
@@ -139,47 +187,45 @@ UDialogueFlowDialogueNode* UConversationGraphDialogueNode::GetDialogueNode() con
  */
 void UConversationGraphDialogueNode::RestoreDynamicConnections(const TArray<UEdGraphPin*>& OldPins)
 {
-	// Build a mapping from old output pin name -> linked pins.
-	TMap<FName, TArray<UEdGraphPin*>> OldLinksByName;
+	// GUID → array of linked pins
+	TMap<FGuid, TArray<UEdGraphPin*>> OldLinksByGuid;
 
+	// Build GUID map
 	for (UEdGraphPin* OldPin : OldPins)
 	{
 		if (!OldPin || OldPin->Direction != EGPD_Output)
-		{
 			continue;
-		}
+
+		if (!OldPin->PersistentGuid.IsValid())
+			continue;
 
 		if (OldPin->LinkedTo.Num() == 0)
-		{
 			continue;
-		}
 
-		TArray<UEdGraphPin*>& LinkedArray = OldLinksByName.FindOrAdd(OldPin->PinName);
+		TArray<UEdGraphPin*>& LinkedArray = OldLinksByGuid.FindOrAdd(OldPin->PersistentGuid);
+
 		for (UEdGraphPin* Linked : OldPin->LinkedTo)
 		{
 			if (Linked)
-			{
 				LinkedArray.Add(Linked);
-			}
 		}
 	}
 
-	// Recreate connections on new pins with matching names.
+	// Reconnect new pins using GUID matches
 	for (UEdGraphPin* NewPin : Pins)
 	{
 		if (!NewPin || NewPin->Direction != EGPD_Output)
-		{
 			continue;
-		}
 
-		if (TArray<UEdGraphPin*>* OldLinkedArray = OldLinksByName.Find(NewPin->PinName))
+		if (!NewPin->PersistentGuid.IsValid())
+			continue;
+
+		if (TArray<UEdGraphPin*>* FoundLinks = OldLinksByGuid.Find(NewPin->PersistentGuid))
 		{
-			for (UEdGraphPin* OtherPin : *OldLinkedArray)
+			for (UEdGraphPin* OtherPin : *FoundLinks)
 			{
 				if (OtherPin)
-				{
 					NewPin->MakeLinkTo(OtherPin);
-				}
 			}
 		}
 	}

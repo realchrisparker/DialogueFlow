@@ -326,7 +326,6 @@ void FConversationEditorToolkit::HandleDeleteSelectedNodes()
         return;
 
     const FGraphPanelSelectionSet Selection = GraphEditor->GetSelectedNodes();
-
     if (Selection.Num() == 0)
         return;
 
@@ -334,10 +333,44 @@ void FConversationEditorToolkit::HandleDeleteSelectedNodes()
 
     for (UObject* Obj : Selection)
     {
-        if (UEdGraphNode* Node = Cast<UEdGraphNode>(Obj))
+        if (UConversationGraphNode* GraphNode = Cast<UConversationGraphNode>(Obj))
         {
-            Node->Modify();
-            Node->DestroyNode();
+            if (UConversationAsset* Asset = EditingAsset)
+            {
+                if (UDialogueFlowBaseNode* Runtime = GraphNode->GetNodeData())
+                {
+                    Asset->Modify();
+                    Asset->Nodes.Remove(Runtime);  // Remove runtime node
+                }
+            }
+
+            GraphNode->Modify();
+            GraphNode->SetNodeData(nullptr);  // Clear editor → runtime link
+            GraphNode->DestroyNode();
+
+            // Remove any stale pin links pointing to the deleted node
+            if (UConversationEdGraph* Graph = Cast<UConversationEdGraph>(EditingAsset->EditorGraph))
+            {
+                for (UEdGraphNode* OtherNode : Graph->Nodes)
+                {
+                    if (!OtherNode) continue;
+
+                    for (UEdGraphPin* OtherPin : OtherNode->Pins)
+                    {
+                        if (!OtherPin) continue;
+
+                        for (int32 i = OtherPin->LinkedTo.Num() - 1; i >= 0; --i)
+                        {
+                            UEdGraphPin* LinkedPin = OtherPin->LinkedTo[i];
+
+                            if (!LinkedPin || LinkedPin->GetOwningNode() == nullptr)
+                            {
+                                OtherPin->LinkedTo.RemoveAt(i);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

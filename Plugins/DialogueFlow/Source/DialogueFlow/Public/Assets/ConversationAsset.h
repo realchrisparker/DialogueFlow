@@ -52,7 +52,7 @@ public:
      * These nodes are instanced subobjects so they can be edited inline,
      * serialized with the asset, and support undo/redo operations.
      */
-    UPROPERTY(EditAnywhere, Instanced, Category = "Dialogue Flow", meta = (DisplayName = "Nodes"))
+    UPROPERTY(VisibleAnywhere, Instanced, Category = "Dialogue Flow", meta = (DisplayName = "Nodes"))
     TArray<class UDialogueFlowBaseNode*> Nodes;
     
 #if WITH_EDITORONLY_DATA
