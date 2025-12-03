@@ -81,6 +81,14 @@ UEdGraphNode* FConversationGraphSchemaAction_NewNode::PerformAction(
 
         // Link graph node ←→ runtime node
         NewGraphNode->SetNodeData(NewRuntimeNode);
+
+        if (NewRuntimeNode)
+        {
+            NewRuntimeNode->PropertyChangedDelegate.AddUObject(
+                NewGraphNode,
+                &UConversationGraphDialogueNode::HandleRuntimeNodePropertyChanged_Internal
+            );
+        }
     }
 
     ParentGraph->NotifyGraphChanged();

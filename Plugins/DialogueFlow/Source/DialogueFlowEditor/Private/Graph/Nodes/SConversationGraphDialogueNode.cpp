@@ -411,6 +411,10 @@ FReply SConversationGraphDialogueNode::HandleAddChoiceClicked()
     {
         if (UEdGraph* Graph = GraphNodeObj->GetGraph())
         {
+            // Rebuild graph node pins
+            GraphNodeObj->ReconstructNode();
+
+            // Force graph to visually update
             Graph->NotifyGraphChanged();
         }
     }
